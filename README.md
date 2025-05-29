@@ -10,7 +10,7 @@ The application is located in the `app` folder. To build it, follow these steps:
 
 ### 2. Get the SDK with the Application
 
-Clone the gps traccer app repository:
+Clone the gps tracker app repository:
 
 ```bash
 git clone https://github.com/NewoPL/A9G-GPS-Tracker.git
