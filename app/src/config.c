@@ -67,13 +67,14 @@ void HandleHelpCommand(void)
     UART_Printf("Available commands:\r\n");
     UART_Printf("  help                   - Show this help message\r\n");
     UART_Printf("  show config            - Print all configuration\r\n");
+    UART_Printf("  show files             - List files in root directory\r\n");
     UART_Printf("  set <param> <value>    - Set value to a specied parameter\r\n");
     UART_Printf("  get <param>            - Print a value of a specified parameter\r\n\r\n");
     UART_Printf("  parameters are:\r\n");
     UART_Printf("     address, port, protocol, apn, apn_user, apn_pass, log_level, log_output, device_name\r\n");
 }
 
-static char* get_config_key_by_param(const char* param)
+static const char* get_config_key_by_param(const char* param)
 {
     struct { const char* param; const char* key; } param_map[] = {
         {"server",      KEY_TRACKING_SERVER_ADDR},
@@ -108,10 +109,10 @@ void HandleSetCommand(char* args)
         return;
     }
 
-    char* key = get_config_key_by_param(field);
+    const char* key = get_config_key_by_param(field);
 
     if (key) {
-        if (Config_SetValue(&g_ConfigStore, key, value)) {
+        if (Config_SetValue(&g_ConfigStore, (char*)key, value)) {
             LOGI("Set %s to %s", field, value);
             if (!Config_Save(&g_ConfigStore, CONFIG_FILE_PATH))
                 LOGE("Failed to save config file");    
@@ -158,6 +159,20 @@ void HandleConfigCommand(void)
     UART_Printf("  device_name : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_DEVICE_NAME, NULL, 0));
 }
 
+void HandleShowFilesCommand(void)
+{
+    UART_Printf("Files in root directory:\r\n");
+    Dir_t* dir = API_FS_OpenDir("/");
+    if (!dir) {
+        UART_Printf("ERROR - cannot open root directory\r\n");
+        return;
+    }
+    Dirent_t* dirent = NULL;
+    while ((dirent = API_FS_ReadDir(dir))) {
+        UART_Printf("  %s\r\n", dirent->d_name);
+    }
+    API_FS_CloseDir(dir);
+}
 
 void HandleUartCommand(char* cmd)
 {
@@ -165,6 +180,8 @@ void HandleUartCommand(char* cmd)
 
     if (strcmp(cmd, "config") == 0) {
         HandleConfigCommand();
+    } else if (strcmp(cmd, "show files") == 0) {
+        HandleShowFilesCommand();
     } else if (strncmp(cmd, "set ", 4) == 0) {
         HandleSetCommand(cmd + 4);
     } else if (strncmp(cmd, "get ", 4) == 0) {
