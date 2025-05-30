@@ -68,7 +68,7 @@ void log_message_internal(LogLevel level, const char *func, const char *format, 
     // Get logger output type from ConfigStore
     switch (g_log_output) {
         case LOGGER_OUTPUT_TRACE:
-            Trace(level, "[%s] %s(): %s\n", log_level_to_string(level), func, message);
+            Trace(level, "[%s] %s(): %s", log_level_to_string(level), func, message);
             break;
         default:
             Log_Printf("[%s] %s(): %s\n", log_level_to_string(level), func, message);
