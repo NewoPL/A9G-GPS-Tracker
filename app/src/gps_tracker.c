@@ -234,13 +234,14 @@ void gps_trackingTask(void *pData)
     LOGI("Initialization.");
     LED_cycle_start(gpsTaskHandle);
     FsInfoTest();
+    while (!IS_INITIALIZED() ||!IS_GSM_STATUS_ON()) OS_Sleep(2000);
 
     GPS_Info_t* gpsInfo = Gps_GetInfo();
     GPS_SaveLog(false, GPS_NMEA_LOG_FILE_PATH);
     // open GPS hardware(UART2 open either)
     GPS_Open(NULL);
     LOGI("Waiting for GPS.");
-    while(!IS_GPS_STATUS_ON());
+    while(!IS_GPS_STATUS_ON()) OS_Sleep(2000);
 
     if(!GPS_GetVersion(responseBuffer, 255))
         LOGE("ERROR - get GPS firmware version fail.");
