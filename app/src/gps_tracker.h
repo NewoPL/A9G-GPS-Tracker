@@ -1,8 +1,8 @@
 #ifndef GPS_TRACKER_H
 #define GPS_TRACKER_H
 
-#define CONFIG_FILE_PATH                 "/config.ini"
-#define GPS_NMEA_LOG_FILE_PATH           "/gps_nmea.log"
+#define CONFIG_FILE_PATH                 "/t/config.ini"
+#define GPS_NMEA_LOG_FILE_PATH           "/t/gps_nmea.log"
 
 #define DEFAULT_APN_VALUE                "internet"
 #define DEFAULT_APN_PASS_VALUE           ""

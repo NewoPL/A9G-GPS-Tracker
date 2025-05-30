@@ -12,7 +12,8 @@ int32_t      g_log_file;
 LogLevel     g_log_level  = DEFAULT_LOG_LEVEL;
 LoggerOutput g_log_output = DEFAULT_LOG_OUTPUT;
 
-static const char* log_level_to_string(LogLevel level) {
+char* log_level_to_string(LogLevel level)
+{
     switch (level) {
         case LOG_LEVEL_ERROR: return "ERROR";
         case LOG_LEVEL_WARN:  return "WARN";
@@ -26,7 +27,7 @@ void set_log_level(LogLevel level) {
     g_log_level = level;
 }
 
-void Log_Printf(const char* fmt, ...) 
+void UART_Printf(const char* fmt, ...) 
 {
     char buffer[LOG_LEVEL_BUFFER_SIZE];
     va_list args;
@@ -36,22 +37,32 @@ void Log_Printf(const char* fmt, ...)
 
     if (len > 0) {
         // Clamp to max buffer size
-        if ((size_t)len >= sizeof(buffer)) {
+        if ((size_t)len >= sizeof(buffer))
             len = sizeof(buffer) - 1;  
-        }
-        switch (g_log_output) {
-            case LOGGER_OUTPUT_FILE:
-                if (g_log_file > 0) 
-                {
-                    API_FS_Write(g_log_file, buffer, (size_t)len);
-                    break;
-                }
-            case LOGGER_OUTPUT_UART:
-            default:
-                UART_Write(UART1, buffer, (size_t)len);
-        }
+
+        UART_Write(UART1, buffer, (size_t)len);
     }
     return;
+}
+
+int32_t FILE_Printf(const char* fmt, ...)
+{
+    char buffer[LOG_LEVEL_BUFFER_SIZE];
+    va_list args;
+    va_start(args, fmt);
+    int len = vsnprintf(buffer, sizeof(buffer), fmt, args);
+    va_end(args);
+
+    if (len > 0) {
+        // Clamp to max buffer size
+        if ((size_t)len >= sizeof(buffer))
+            len = sizeof(buffer) - 1;  
+
+        int ret = API_FS_Write(g_log_file, buffer, (size_t)len);
+        if (ret <= 0)
+            UART_Write(UART1, buffer, (size_t)len);
+    }
+    return 0;
 }
 
 void log_message_internal(LogLevel level, const char *func, const char *format, ...)
@@ -70,8 +81,11 @@ void log_message_internal(LogLevel level, const char *func, const char *format, 
         case LOGGER_OUTPUT_TRACE:
             Trace(level, "[%s] %s(): %s", log_level_to_string(level), func, message);
             break;
+        case LOGGER_OUTPUT_FILE:
+            FILE_Printf("[%s] %s(): %s\n", log_level_to_string(level), func, message);
+            break;
         default:
-            Log_Printf("[%s] %s(): %s\n", log_level_to_string(level), func, message);
+            UART_Printf("[%s] %s(): %s\n", log_level_to_string(level), func, message);
             break;
     }
 }
