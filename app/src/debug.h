@@ -2,6 +2,7 @@
 #define DEBUG_H
 
 #define DEFAULT_LOG_LEVEL     LOG_LEVEL_INFO
+#define DEFAULT_LOG_OUTPUT    LOGGER_OUTPUT_UART    
 #define LOG_LEVEL_BUFFER_SIZE 1024
 
 // Log levels
@@ -13,14 +14,29 @@ typedef enum {
     LOG_LEVEL_DEBUG
 } LogLevel;
 
-extern LogLevel g_current_log_level;
+// Log output
+typedef enum {
+    LOGGER_OUTPUT_UART = 0,
+    LOGGER_OUTPUT_TRACE,
+    LOGGER_OUTPUT_FILE
+} LoggerOutput;
+
+extern LoggerOutput g_log_output;
+extern LogLevel     g_log_level;
+extern int32_t      g_log_file;
 
 void set_log_level(LogLevel level);
 void log_message_internal(LogLevel level, const char *func, const char *format, ...);
-void UART_Log(const char* fmt, ...);
 
-#define log_message(level, format, ...) \
+#define LOG(level, format, ...) \
     log_message_internal(level, __func__, format, ##__VA_ARGS__)
+#define LOGE(format, ...) \
+    log_message_internal(LOG_LEVEL_ERROR, __func__, format, ##__VA_ARGS__)
+#define LOGW(format, ...) \
+    log_message_internal(LOG_LEVEL_WARN,  __func__, format, ##__VA_ARGS__)
+#define LOGI(format, ...) \
+    log_message_internal(LOG_LEVEL_INFO,  __func__, format, ##__VA_ARGS__)
+#define LOGD(format, ...) \
+    log_message_internal(LOG_LEVEL_DEBUG, __func__, format, ##__VA_ARGS__)
 
 #endif // DEBUG
-_H

@@ -8,7 +8,6 @@
 #include <api_lbs.h>
 #include <api_hal_uart.h>
 #include <api_hal_pm.h>
-#include <api_debug.h>
 
 #include "buffer.h"
 #include "gps_parse.h"
@@ -23,6 +22,7 @@
 #include "config.h"
 #include "config_parser.h"
 #include "led_handler.h"
+#include "debug.h"
 
 #define MAIN_TASK_STACK_SIZE    (2048 * 2)
 #define MAIN_TASK_PRIORITY      0
@@ -55,16 +55,16 @@ bool AttachActivate()
     bool ret = Network_GetAttachStatus(&status);
     if(!ret)
     {
-        UART_Log("ERROR - get attach status\r\n");
+        LOGE("ERROR - get attach status\r\n");
         return false;
     }
     if(!status)
     {
         ret = Network_StartAttach();
-        UART_Log("attaching to the network\r\n");
+        LOGI("attaching to the network\r\n");
         if(!ret)
         {
-            UART_Log("ERROR - network attach failed\r\n");
+            LOGE("ERROR - network attach failed\r\n");
             return false;
         }
     }
@@ -73,7 +73,7 @@ bool AttachActivate()
         ret = Network_GetActiveStatus(&status);
         if(!ret)
         {
-            UART_Log("ERROR - get activate status failed\r\n");
+            LOGE("ERROR - get activate status failed\r\n");
             return false;
         }
         if(!status)
@@ -86,17 +86,17 @@ bool AttachActivate()
             };
             ret = Network_StartActive(NetContextDummy);
             if(!ret) {
-               UART_Log("ERROR - network activate failed fail\r\n");
+               LOGE("ERROR - network activate failed fail\r\n");
                return false;
             }
             */
-            UART_Log("activating the network\r\n");
+            LOGI("activating the network\r\n");
             Config_GetValue(&g_ConfigStore, KEY_APN,      NetContext.apn,        sizeof(NetContext.apn));
             Config_GetValue(&g_ConfigStore, KEY_APN_USER, NetContext.userName,   sizeof(NetContext.userName));
             Config_GetValue(&g_ConfigStore, KEY_APN_PASS, NetContext.userPasswd, sizeof(NetContext.userPasswd));
             ret = Network_StartActive(NetContext);
             if(!ret) {
-               UART_Log("ERROR - network activate failed fail\r\n");
+               LOGE("ERROR - network activate failed fail\r\n");
                return false;
             }
         }
@@ -125,71 +125,71 @@ void processNetworkCellInfo(Network_Location_t* loc, int number)
              loc->sMcc[0], loc->sMcc[1], loc->sMcc[2], loc->sMnc[0], loc->sMnc[1], loc->sMnc[2], loc->sLac, loc->sCellID, loc->iRxLev);
 }
 
-void EventDispatch(API_Event_t* pEvent)
+void EventHanler(API_Event_t* pEvent)
 {
     switch(pEvent->id)
     {
         case API_EVENT_ID_NO_SIMCARD:
             GSM_STATUS_OFF();
-            UART_Log("ERROR - no sim card %d !\r\n", pEvent->param1);
+            LOGE("ERROR - no sim card %d !\r\n", pEvent->param1);
             break;
         case API_EVENT_ID_SIMCARD_DROP:
             GSM_STATUS_OFF();
-            UART_Log("ERROR - sim card %d drop !\r\n",pEvent->param1);
+            LOGE("ERROR - sim card %d drop !\r\n",pEvent->param1);
             break;
         case API_EVENT_ID_NETWORK_REGISTER_SEARCHING:
-            UART_Log("network register searching\r\n");
+            LOGI("network register searching\r\n");
             break;
         case API_EVENT_ID_NETWORK_REGISTER_DENIED:
-            UART_Log("network register denied\r\n");
+            LOGI("network register denied\r\n");
             GSM_STATUS_OFF();
             break;
         case API_EVENT_ID_NETWORK_REGISTER_NO:
             GSM_STATUS_OFF();
-            UART_Log("network register no\r\n");
+            LOGI("network register no\r\n");
             break;
 
         case API_EVENT_ID_NETWORK_REGISTERED_HOME:
         case API_EVENT_ID_NETWORK_REGISTERED_ROAMING:
-            UART_Log("network register success\r\n");
+            LOGI("network register success\r\n");
             AttachActivate();
             break;
 
         case API_EVENT_ID_NETWORK_ATTACHED:
-            UART_Log("network attach success\r\n");
+            LOGI("network attach success\r\n");
             AttachActivate();
             break;
 
         case API_EVENT_ID_NETWORK_ACTIVATED:
             GSM_STATUS_ON();
-            UART_Log("network activate success\r\n");
+            LOGI("network activate success\r\n");
             break;
 
         case API_EVENT_ID_NETWORK_ACTIVATE_FAILED:
             GSM_STATUS_OFF();
-            UART_Log("network activate failed\r\n");
+            LOGE("network activate failed\r\n");
             break;
 
         case API_EVENT_ID_NETWORK_DEACTIVED:
             GSM_STATUS_OFF(); 
-            UART_Log("network deactived\r\n");
+            LOGI("network deactived\r\n");
             AttachActivate();
             break;
 
         case API_EVENT_ID_NETWORK_ATTACH_FAILED:
             GSM_STATUS_OFF();
-            UART_Log("network attach failed\r\n");
+            LOGE("network attach failed\r\n");
             break;
 
         case API_EVENT_ID_NETWORK_DETACHED:
             GSM_STATUS_OFF();
-            UART_Log("network detached\r\n");
+            LOGI("network detached\r\n");
             AttachActivate();
             break;
 
         case API_EVENT_ID_SIGNAL_QUALITY:
             g_RSSI = csq_to_percent(pEvent->param1);
-            UART_Log("CSQ: %d %\r\n", g_RSSI);
+            LOGI("CSQ: %d %\r\n", g_RSSI);
             break;
 
         case API_EVENT_ID_NETWORK_CELL_INFO:
@@ -197,12 +197,12 @@ void EventDispatch(API_Event_t* pEvent)
             break;
 
         case API_EVENT_ID_SYSTEM_READY:
-            UART_Log("system initialize complete\r\n");
+            LOGI("system initialize complete\r\n");
             INITIALIZED_ON();
             break;
 
         case API_EVENT_ID_GPS_UART_RECEIVED:
-            // Trace(1,"received GPS data,length:%d, data:%s,flag:%d",pEvent->param1,pEvent->pParam1,flag);
+            LOGD("received GPS data, length:%d, data:%s",pEvent->param1,pEvent->pParam1);
             GPS_Update(pEvent->pParam1, pEvent->param1);
 
             GPS_Info_t* gpsInfo = Gps_GetInfo();
@@ -232,16 +232,16 @@ void gps_trackingTask(void *pData)
 {
     // wait for initialization
     // The process of GPRS registration network may cause the power supply voltage of GPS to drop, which resulting in GPS restart.
-    UART_Log("Initialization ");
+    LOGI("Initialization ");
     LED_cycle_start(gpsTaskHandle);
  FsInfoTest();
 
     while(!IS_INITIALIZED() || !IS_GSM_STATUS_ON())
     {
-        UART_Log(".");
+        LOGI(".");
         OS_Sleep(2000);
     }
-    UART_Log("\r\n");
+    LOGI("\r\n");
 
     GPS_Info_t* gpsInfo = Gps_GetInfo();
     GPS_SaveLog(false, GPS_NMEA_LOG_FILE_PATH);
@@ -249,48 +249,48 @@ void gps_trackingTask(void *pData)
     // open GPS hardware(UART2 open either)
     GPS_Open(NULL);
 
-    UART_Log("Waiting for GPS ");
+    LOGI("Waiting for GPS ");
     while(!IS_GPS_STATUS_ON())
     {
-        UART_Log(".");
+        LOGI(".");
         OS_Sleep(2000);
     }
-    UART_Log("\r\n");
+    LOGI("\r\n");
 
     if(!GPS_GetVersion(responseBuffer, 255))
-        UART_Log("ERROR - get GPS firmware version fail.\r\n");
+        LOGE("ERROR - get GPS firmware version fail.\r\n");
     else
-        UART_Log("GPS firmware version: %s\r\n", responseBuffer);
+        LOGI("GPS firmware version: %s\r\n", responseBuffer);
 
 //    if(!GPS_SetSearchMode(true, true, false, true))
-        //UART_Log("ERROR - set search mode fail.\r\n");
+        //UART_Printf("ERROR - set search mode fail.\r\n");
 
     if(!GPS_SetFixMode(GPS_FIX_MODE_NORMAL))
-        UART_Log("ERROR - set fix mode fail.\r\n");
+        LOGE("ERROR - set fix mode fail.\r\n");
 
     // if(!GPS_ClearLog())
-    //     UART_Log("open file error, please check tf card\r\n");
+    //     UART_Printf("open file error, please check tf card\r\n");
 
     // if(!GPS_ClearInfoInFlash())
-    //     UART_Log("erase gps fail\r\n");
+    //     UART_Printf("erase gps fail\r\n");
     
     // if(!GPS_SetQzssOutput(false))
-    //     UART_Log("enable qzss nmea output fail\r\n");
+    //     UART_Printf("enable qzss nmea output fail.\r\n");
 
 
     // if(!GPS_SetSBASEnable(true))
-    //     UART_Log("enable sbas fail\r\n");
+    //     UART_Printf("enable sbas fail.\r\n");
     
-    UART_Log("setting GPS LP Mode to GPS_LP_MODE_NORMAL.\r\n");
+    LOGI("setting GPS LP Mode to GPS_LP_MODE_NORMAL.\r\n");
     if(!GPS_SetLpMode(GPS_LP_MODE_SUPPER_LP))
-        UART_Log("ERROR - set GPS LP mode failed.\r\n");
+        LOGE("ERROR - set GPS LP mode failed.\r\n");
 
-    UART_Log("setting GPS interval to 1000 ms\r\n");
+    LOGI("setting GPS interval to 1000 ms\r\n");
     if(!GPS_SetOutputInterval(1000))
-        UART_Log("ERROR - set GPS interval failed.\r\n");
+        LOGE("ERROR - set GPS interval failed.\r\n");
     
     const char *device_name = Config_GetValue(&g_ConfigStore, KEY_DEVICE_NAME, NULL, 0);
-    UART_Log("Device name: %s\r\n", device_name);
+    LOGI("Device name: %s\r\n", device_name);
 
     while(1)
     {
@@ -299,7 +299,7 @@ void gps_trackingTask(void *pData)
         {
             if(!Network_GetCellInfoRequst()) {
                 g_cellInfo[0] = '\0';
-                UART_Log("ERROR - network get cell info fail\r\n");
+                LOGE("ERROR - network get cell info fail\r\n");
             }
 
             struct timespec timestamp;
@@ -351,30 +351,30 @@ void gps_trackingTask(void *pData)
                 if (strcmp(protocol, "https") == 0)
                 {
                     if (Https_Post(&SSLconfig, serverName, serverPort, "/", requestBuffer, strlen(requestBuffer), responseBuffer, sizeof(responseBuffer)) < 0)
-                        UART_Log("FAILED to send the location to the server via HTTPS\r\n");
+                        LOGE("FAILED to send the location to the server via HTTPS\r\n");
                     else
-                        UART_Log("sent location to server via HTTPS\r\n");
+                        LOGI("sent location to server via HTTPS\r\n");
                 }
                 else if (strcmp(protocol, "http") == 0)
                 {
                     if (Http_Post(serverName, atoi(serverPort), "/", requestBuffer, strlen(requestBuffer), responseBuffer, sizeof(responseBuffer)) < 0)
-                        UART_Log("FAILED to send the location to the server via HTTP\r\n");
+                        LOGE("FAILED to send the location to the server via HTTP\r\n");
                     else
-                        UART_Log("sent location to server via HTTP\r\n");
+                        LOGI("sent location to server via HTTP\r\n");
                 }
                 else
                 {
-                    UART_Log("unknown protocol: %s\r\n", protocol);
+                    LOGE("unknown protocol: %s\r\n", protocol);
                 }
             }
             else
             {
-                UART_Log("no internet\r\n");
+                LOGE("no internet\r\n");
             }
         }
         else
         {
-            UART_Log("no GPS fix\r\n");
+            LOGE("no GPS fix\r\n");
         }
 
         uint32_t loop_end = time(NULL);
@@ -416,7 +416,7 @@ void gps_MainTask(void *pData)
 
         if(OS_WaitEvent(gpsTaskHandle, (void**)&event, OS_TIME_OUT_WAIT_FOREVER))
         {
-            EventDispatch(event);
+            EventHanler(event);
             OS_Free(event->pParam1);
             OS_Free(event->pParam2);
             OS_Free(event);

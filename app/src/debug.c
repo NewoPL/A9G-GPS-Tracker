@@ -1,11 +1,16 @@
 #include <stdio.h>
 #include <stdarg.h>
+#include <string.h>
 
+#include "api_fs.h"
 #include <api_hal_uart.h>
 
 #include "debug.h"
+#include "config.h"
 
-LogLevel g_current_log_level = DEFAULT_LOG_LEVEL;
+int32_t      g_log_file;
+LogLevel     g_log_level  = DEFAULT_LOG_LEVEL;
+LoggerOutput g_log_output = DEFAULT_LOG_OUTPUT;
 
 static const char* log_level_to_string(LogLevel level) {
     switch (level) {
@@ -18,10 +23,10 @@ static const char* log_level_to_string(LogLevel level) {
 }
 
 void set_log_level(LogLevel level) {
-    g_current_log_level = level;
+    g_log_level = level;
 }
 
-void UART_Log(const char* fmt, ...) 
+void Log_Printf(const char* fmt, ...) 
 {
     char buffer[LOG_LEVEL_BUFFER_SIZE];
     va_list args;
@@ -34,25 +39,39 @@ void UART_Log(const char* fmt, ...)
         if ((size_t)len >= sizeof(buffer)) {
             len = sizeof(buffer) - 1;  
         }
-        UART_Write(UART1, buffer, (size_t)len);
+        switch (g_log_output) {
+            case LOGGER_OUTPUT_FILE:
+                if (g_log_file > 0) 
+                {
+                    API_FS_Write(g_log_file, buffer, (size_t)len);
+                    break;
+                }
+            case LOGGER_OUTPUT_UART:
+            default:
+                UART_Write(UART1, buffer, (size_t)len);
+        }
     }
-    
     return;
 }
 
 void log_message_internal(LogLevel level, const char *func, const char *format, ...)
 {
-    if (level > g_current_log_level || level == LOG_LEVEL_NONE)
+    if (level > g_log_level || level == LOG_LEVEL_NONE)
         return;
 
-    char message[512];
+    char message[LOG_LEVEL_BUFFER_SIZE];
     va_list args;
-
-    // Format the main message
     va_start(args, format);
     vsnprintf(message, sizeof(message), format, args);
     va_end(args);
 
-    // Send the full log line to UART
-    UART_Log("[%s] %s(): %s\n", log_level_to_string(level), func, message);
+    // Get logger output type from ConfigStore
+    switch (g_log_output) {
+        case LOGGER_OUTPUT_TRACE:
+            Trace(level, "[%s] %s(): %s\n", log_level_to_string(level), func, message);
+            break;
+        default:
+            Log_Printf("[%s] %s(): %s\n", log_level_to_string(level), func, message);
+            break;
+    }
 }

@@ -13,6 +13,7 @@
 #define KEY_TRACKING_SERVER_PORT         "tracking server port"
 #define KEY_TRACKING_SERVER_PROTOCOL     "tracking server protocol"
 #define KEY_DEVICE_NAME                  "device name"
+#define KEY_LOGGER_OUTPUT                "logger_output"
 
 typedef struct {
     char key[MAX_KEY_LENGTH];

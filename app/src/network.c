@@ -4,10 +4,10 @@
 #include <api_socket.h>
 #include <api_ssl.h>
 #include <api_hal_uart.h>
-#include <api_debug.h>
 
 #include "network.h"
 #include "gps_tracker.h"
+#include "debug.h"
 
 const char *ca_cert = "-----BEGIN CERTIFICATE-----\n\
 MIICjjCCAjOgAwIBAgIQf/NXaJvCTjAtkOGKQb0OHzAKBggqhkjOPQQDAjBQMSQw\n\
@@ -36,7 +36,7 @@ int Https_Post(SSL_Config_t *sslConfig,
                int           retBufferSize)
 {
     if (strlen(data) != dataLen) {
-        Trace(1, "dataLen mismatch with actual data length");
+        LOGE("dataLen mismatch with actual data length");
         return -1;
     }
 
@@ -44,10 +44,10 @@ int Https_Post(SSL_Config_t *sslConfig,
     uint8_t ip[16];
     memset(ip, 0, sizeof(ip));
     if(DNS_GetHostByName2(hostName, ip) != 0) {
-        Trace(1,"Cannot resolve the hostName name");
+        LOGE("Cannot resolve the hostName name");
         return -1;
     } else {
-        Trace(1,"Resolved IP for %s -> %s", hostName, ip);
+        LOGI("Resolved IP for %s -> %s", hostName, ip);
     }
 
     // Create the HTTP POST request package
@@ -60,23 +60,23 @@ int Https_Post(SSL_Config_t *sslConfig,
     // Calculate the required buffer size
     int bufferLen = snprintf(NULL, 0, fmt, path, hostName, dataLen, data);
     if (bufferLen <= 0) {
-        UART_Log("ERROR - Failed to calculate buffer size\r\n");
+        LOGE("ERROR - Failed to calculate buffer size\r\n");
         return -1;
     }
 
     // Allocate the buffer dynamically
     char* buffer = (char*)OS_Malloc(bufferLen + 1);
     if (!buffer) {
-        UART_Log("ERROR - Failed to allocate memory for HTTP package\r\n");
+        LOGE("ERROR - Failed to allocate memory for HTTP package\r\n");
         return -1;
     }
      
     // Build the package
     snprintf(buffer, bufferLen, fmt, path, hostName, dataLen, data);
     buffer[bufferLen] = 0;
-//  UART_Log("HTTP Package:\r\n");
+//  UART_Printf("HTTP Package:\r\n");
 //  UART_Write(UART1, buffer, bufferLen);
-//  UART_Log("\r\n");
+//  UART_Printf("\r\n");
 
     SSL_Error_t error;
     sslConfig->caCert = ca_cert;
@@ -84,22 +84,22 @@ int Https_Post(SSL_Config_t *sslConfig,
 
     error = SSL_Init(sslConfig);
     if(error != SSL_ERROR_NONE) {
-        UART_Log("ERROR - SSL init error: %d\r\n",error);
+        LOGE("ERROR - SSL init error: %d\r\n",error);
         goto err_free_buf;
     }
 
     // Connect to server
     error = SSL_Connect(sslConfig, hostName, port);
     if(error != SSL_ERROR_NONE) {
-        UART_Log("ERROR - SSL connect error: %d\r\n",error);
+        LOGE("ERROR - SSL connect error: %d\r\n",error);
         goto err_ssl_destroy;
     }
 
     // Send package
-    // UART_Log("SSL Write len:%d data:%s\r\n", bufferLen, buffer);
+    // UART_Printf("SSL Write len:%d data:%s\r\n", bufferLen, buffer);
     error = SSL_Write(sslConfig, buffer, bufferLen, SSL_WRITE_TIMEOUT);
     if(error <= 0) {
-        UART_Log("ERROR - SSL Write error: %d\r\n", error);
+        LOGE("ERROR - SSL Write error: %d\r\n", error);
         goto err_ssl_close;
     }
 
@@ -107,26 +107,26 @@ int Https_Post(SSL_Config_t *sslConfig,
     memset(retBuffer, 0, retBufferSize);
     error = SSL_Read(sslConfig, retBuffer, retBufferSize, SSL_READ_TIMEOUT);
     if(error < 0) {
-        UART_Log("ERROR - SSL Read error: %d\r\n", error);
+        LOGE("ERROR - SSL Read error: %d\r\n", error);
         goto err_ssl_close;
     }
     if(error == 0) {
-        UART_Log("ERROR - SSL no receive response\r\n");
+        LOGE("ERROR - SSL no receive response\r\n");
         error = SSL_ERROR_INTERNAL;
         goto err_ssl_close;
     }
-    // UART_Log("SSL Read: len:%d, data:%s\r\n", error, retBuffer);
+    // UART_Printf("SSL Read: len:%d, data:%s\r\n", error, retBuffer);
 
 err_ssl_close:
     // Close the SSL connection
     if (SSL_Close(sslConfig) != SSL_ERROR_NONE) {
-        UART_Log("ERROR - ssl close error: %d\r\n", error);
+        LOGE("ERROR - ssl close error: %d\r\n", error);
     }
 
 err_ssl_destroy:
     // Destroy the SSL context
     if (SSL_Destroy(sslConfig) != SSL_ERROR_NONE) {
-        UART_Log("ERROR - ssl destroy error: %d\r\n", error);
+        LOGE("ERROR - ssl destroy error: %d\r\n", error);
     } 
 
 err_free_buf:
@@ -151,15 +151,15 @@ int Http_Post(const char  *domain,
     memset(ip,0,sizeof(ip));
     if(DNS_GetHostByName2(domain,ip) != 0)
     {
-        Trace(2,"get ip error");
+        LOGE("get ip error");
         return -1;
     }
-    // Trace(2,"get ip success:%s -> %s",domain,ip);
+    // LOGI("get ip success:%s -> %s",domain,ip);
     char* servInetAddr = ip;
     char* temp = OS_Malloc(2048);
     if(!temp)
     {
-        Trace(2,"malloc fail");
+        LOGE("malloc fail");
         return -1;
     }
     snprintf(temp,2048,"POST %s HTTP/1.1\r\nContent-Type: application/x-www-form-urlencoded\r\nConnection: Keep-Alive\r\nHost: %s\r\nContent-Length: %d\r\n\r\n",
@@ -167,11 +167,11 @@ int Http_Post(const char  *domain,
     char* pData = temp;
     int fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if(fd < 0){
-        Trace(2,"socket fail");
+        LOGE("socket fail");
         OS_Free(temp);
         return -1;
     }
-    // Trace(2,"fd:%d",fd);
+    // LOGI("fd:%d",fd);
 
     struct sockaddr_in sockaddr;
     memset(&sockaddr,0,sizeof(sockaddr));
@@ -181,28 +181,28 @@ int Http_Post(const char  *domain,
 
     int ret = connect(fd, (struct sockaddr*)&sockaddr, sizeof(struct sockaddr_in));
     if(ret < 0){
-        Trace(2,"socket connect fail");
+        LOGE("socket connect fail");
         OS_Free(temp);
         close(fd);
         return -1;
     }
-    // Trace(2,"socket connect success");
-    Trace(2,"send request:%s",pData);
+    // LOGI("socket connect success");
+    LOGI("send request:%s",pData);
     ret = send(fd, pData, strlen(pData), 0);
     if(ret < 0){
-        Trace(2,"socket send fail");
+        LOGE("socket send fail");
         OS_Free(temp);
         close(fd);
         return -1;
     }
     ret = send(fd, body, bodyLen, 0);
     if(ret < 0){
-        Trace(2,"socket send fail");
+        LOGE("socket send fail");
         OS_Free(temp);
         close(fd);
         return -1;
     }
-    // Trace(2,"socket send success");
+    // LOGI("socket send success");
 
     struct fd_set fds;
     struct timeval timeout={12,0};
@@ -211,15 +211,15 @@ int Http_Post(const char  *domain,
     while(!flag)
     {
         ret = select(fd+1,&fds,NULL,NULL,&timeout);
-        // Trace(2,"select return:%d",ret);
+        // LOGI("select return:%d",ret);
         switch(ret)
         {
             case -1:
-                Trace(2,"select error");
+                LOGE("select error");
                 flag = true;
                 break;
             case 0:
-                Trace(2,"select timeout");
+                LOGE("select timeout");
                 flag = true;
                 break;
             default:
@@ -230,18 +230,18 @@ int Http_Post(const char  *domain,
                     recvLen += ret;
                     if(ret < 0)
                     {
-                        Trace(2,"recv error");
+                        LOGE("recv error");
                         flag = true;
                         break;
                     }
                     else if(ret == 0)
                     {
-                        Trace(2,"ret == 0");
+                        LOGI("ret == 0");
                         break;
                     }
                     else if(ret < 1352)
                     {
-                        UART_Log("recv len:%d, data:%s \r\n", recvLen, retBuffer);
+                        LOGI("recv len:%d, data:%s \r\n", recvLen, retBuffer);
                         close(fd);
                         OS_Free(temp);
                         return recvLen;
