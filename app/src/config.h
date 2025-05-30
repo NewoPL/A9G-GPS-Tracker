@@ -24,9 +24,11 @@ typedef struct {
     int count;
 } Config;
 
-extern Config ConfigStore;
+extern Config g_ConfigStore;
 
+void FsInfoTest();
 void ConfigStore_Init();
-void HandleUartCommand(const char* cmd);
+void HandleUartCommand(char* cmd);
+
 
 #endif

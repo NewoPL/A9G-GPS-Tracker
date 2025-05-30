@@ -49,25 +49,6 @@ SSL_Config_t SSLconfig = {
 
 // const uint8_t nmea[]="$GNGGA,000021.263,2228.7216,N,11345.5625,E,0,0,,153.3,M,-3.3,M,,*4E\r\n$GPGSA,A,1,,,,,,,,,,,,,,,*1E\r\n$BDGSA,A,1,,,,,,,,,,,,,,,*0F\r\n$GPGSV,1,1,00*79\r\n$BDGSV,1,1,00*68\r\n$GNRMC,000021.263,V,2228.7216,N,11345.5625,E,0.000,0.00,060180,,,N*5D\r\n$GNVTG,0.00,T,,M,0.000,N,0.000,K,N*2C\r\n";
 
-void UART_Log(const char* fmt, ...) 
-{
-    char buffer[1024];
-    va_list args;
-    va_start(args, fmt);
-    int len = vsnprintf(buffer, sizeof(buffer), fmt, args);
-    va_end(args);
-
-    if (len > 0) {
-        // Clamp to max buffer size
-        if ((size_t)len >= sizeof(buffer)) {
-            len = sizeof(buffer) - 1;  
-        }
-        UART_Write(UART1, buffer, (size_t)len);
-    }
-    
-    return;
-}
-
 bool AttachActivate()
 {
     uint8_t status;
@@ -110,9 +91,9 @@ bool AttachActivate()
             }
             */
             UART_Log("activating the network\r\n");
-            Config_GetValue(&ConfigStore, KEY_APN,      NetContext.apn,        sizeof(NetContext.apn));
-            Config_GetValue(&ConfigStore, KEY_APN_USER, NetContext.userName,   sizeof(NetContext.userName));
-            Config_GetValue(&ConfigStore, KEY_APN_PASS, NetContext.userPasswd, sizeof(NetContext.userPasswd));
+            Config_GetValue(&g_ConfigStore, KEY_APN,      NetContext.apn,        sizeof(NetContext.apn));
+            Config_GetValue(&g_ConfigStore, KEY_APN_USER, NetContext.userName,   sizeof(NetContext.userName));
+            Config_GetValue(&g_ConfigStore, KEY_APN_PASS, NetContext.userPasswd, sizeof(NetContext.userPasswd));
             ret = Network_StartActive(NetContext);
             if(!ret) {
                UART_Log("ERROR - network activate failed fail\r\n");
@@ -253,6 +234,7 @@ void gps_trackingTask(void *pData)
     // The process of GPRS registration network may cause the power supply voltage of GPS to drop, which resulting in GPS restart.
     UART_Log("Initialization ");
     LED_cycle_start(gpsTaskHandle);
+ FsInfoTest();
 
     while(!IS_INITIALIZED() || !IS_GSM_STATUS_ON())
     {
@@ -307,7 +289,7 @@ void gps_trackingTask(void *pData)
     if(!GPS_SetOutputInterval(1000))
         UART_Log("ERROR - set GPS interval failed.\r\n");
     
-    const char *device_name = Config_GetValue(&ConfigStore, KEY_DEVICE_NAME, NULL, 0);
+    const char *device_name = Config_GetValue(&g_ConfigStore, KEY_DEVICE_NAME, NULL, 0);
     UART_Log("Device name: %s\r\n", device_name);
 
     while(1)
@@ -363,9 +345,9 @@ void gps_trackingTask(void *pData)
 
             if(IS_GSM_STATUS_ON())
             {
-                const char* serverName = Config_GetValue(&ConfigStore, KEY_TRACKING_SERVER_ADDR,     NULL, 0);
-                const char* serverPort = Config_GetValue(&ConfigStore, KEY_TRACKING_SERVER_PORT,     NULL, 0);
-                const char* protocol   = Config_GetValue(&ConfigStore, KEY_TRACKING_SERVER_PROTOCOL, NULL, 0);
+                const char* serverName = Config_GetValue(&g_ConfigStore, KEY_TRACKING_SERVER_ADDR,     NULL, 0);
+                const char* serverPort = Config_GetValue(&g_ConfigStore, KEY_TRACKING_SERVER_PORT,     NULL, 0);
+                const char* protocol   = Config_GetValue(&g_ConfigStore, KEY_TRACKING_SERVER_PROTOCOL, NULL, 0);
                 if (strcmp(protocol, "https") == 0)
                 {
                     if (Https_Post(&SSLconfig, serverName, serverPort, "/", requestBuffer, strlen(requestBuffer), responseBuffer, sizeof(responseBuffer)) < 0)

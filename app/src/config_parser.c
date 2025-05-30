@@ -8,8 +8,9 @@
 
 #include "config.h"
 #include "config_parser.h"
+#include "gps_tracker.h"
 
-static char* trim_whitespace(char* str)
+char* trim_whitespace(char* str)
 {
     if (!str) return NULL;
 
@@ -58,7 +59,7 @@ bool Config_Load(Config* config, char* filename)
     int32_t fd = API_FS_Open(filename, FS_O_RDWR, 0);
     if (fd < 0)
     {
-        Trace(1, "Open file failed: %d", fd);
+        UART_Log("Open file failed: %d\r\n", fd);
         return false;
     }
 
@@ -71,7 +72,7 @@ bool Config_Load(Config* config, char* filename)
         int32_t read_bytes = API_FS_Read(fd, buffer + leftover, sizeof(buffer) - leftover - 1);
         if (read_bytes < 0)
         {
-            Trace(1, "Read error: %d", read_bytes);
+            UART_Log("Read error: %d\r\n", read_bytes);
             API_FS_Close(fd);
             return false;
         }
@@ -136,7 +137,7 @@ bool Config_Save(Config* config, char* filename)
     int32_t fd = API_FS_Open(filename, FS_O_RDWR | FS_O_CREAT | FS_O_TRUNC, 0);
     if ( fd < 0)
     {
-        Trace(1,"Open file failed:%d",fd);
+        UART_Log("Open file failed:%d\r\n",fd);
 	    return false;
     }
 
@@ -149,13 +150,13 @@ bool Config_Save(Config* config, char* filename)
                            config->entries[i].value);
 
         if (len < 0 || len >= sizeof(line)) {
-            Trace(1, "Line too long to write (entry %d)", i);
+            UART_Log("Line too long to write (entry %d)\r\n", i);
             API_FS_Close(fd);
             return false;
         }
 
         if (API_FS_Write(fd, line, len) != len) {
-            Trace(1, "Write failed at entry %d", i);
+            UART_Log("Write failed at entry %d\r\n", i);
             API_FS_Close(fd);
             return false;
         }        

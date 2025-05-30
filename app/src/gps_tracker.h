@@ -12,6 +12,4 @@
 #define DEFAULT_TRACKING_SERVER_PROTOCOL "https"
 #define DEFAULT_DEVICE_NAME              "gps"
 
-void UART_Log(const char* fmt, ...);
-
 #endif
