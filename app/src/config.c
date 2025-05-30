@@ -67,7 +67,7 @@ void HandleHelpCommand(void)
     UART_Printf("Available commands:\r\n");
     UART_Printf("  help                   - Show this help message\r\n");
     UART_Printf("  show config            - Print all configuration\r\n");
-    UART_Printf("  show files             - List files in root directory\r\n");
+    UART_Printf("  show files [path]      - List files in specified folder (default: /)\r\n");
     UART_Printf("  set <param> <value>    - Set value to a specied parameter\r\n");
     UART_Printf("  get <param>            - Print a value of a specified parameter\r\n\r\n");
     UART_Printf("  parameters are:\r\n");
@@ -159,17 +159,37 @@ void HandleConfigCommand(void)
     UART_Printf("  device_name : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_DEVICE_NAME, NULL, 0));
 }
 
-void HandleShowFilesCommand(void)
+void HandleShowFilesCommand(char* path)
 {
-    UART_Printf("Files in root directory:\r\n");
-    Dir_t* dir = API_FS_OpenDir("/");
+    if (!path || path[0] == '\0') path = "/";
+    path = trim_whitespace(path);
+    UART_Printf("Files in %s:\r\n", path);
+    Dir_t* dir = API_FS_OpenDir(path);
     if (!dir) {
-        UART_Printf("ERROR - cannot open root directory\r\n");
+        UART_Printf("cannot open directory: %s\r\n", path);
         return;
     }
     Dirent_t* dirent = NULL;
     while ((dirent = API_FS_ReadDir(dir))) {
-        UART_Printf("  %s\r\n", dirent->d_name);
+        char *file_type = NULL;
+        char  file_path[256];
+        int   file_size = 0;
+
+        if (dirent->d_type == 8) file_type = "<file>";
+        else if (dirent->d_type == 4) file_type = "<dir>";
+        else file_type = "<unknown>";
+        
+        snprintf(file_path, sizeof(file_path),"%s%s",path,dirent->d_name);
+        
+        int32_t fd = API_FS_Open(file_path, FS_O_RDONLY, 0);
+        if(fd < 0)
+            LOGE("open file %s fail", file_path);
+        else
+        {
+            file_size = (int)API_FS_GetFileSize(fd);
+            API_FS_Close(fd);
+        }
+        UART_Printf("%s  %s\r\n", file_type, file_path);
     }
     API_FS_CloseDir(dir);
 }
@@ -180,8 +200,8 @@ void HandleUartCommand(char* cmd)
 
     if (strcmp(cmd, "config") == 0) {
         HandleConfigCommand();
-    } else if (strcmp(cmd, "show files") == 0) {
-        HandleShowFilesCommand();
+    } else if (strncmp(cmd, "show files", 10) == 0) {
+        HandleShowFilesCommand(cmd + 10);
     } else if (strncmp(cmd, "set ", 4) == 0) {
         HandleSetCommand(cmd + 4);
     } else if (strncmp(cmd, "get ", 4) == 0) {
