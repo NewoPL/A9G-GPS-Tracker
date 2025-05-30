@@ -138,15 +138,15 @@ void EventHanler(API_Event_t* pEvent)
             LOGE("ERROR - sim card %d drop !\r\n",pEvent->param1);
             break;
         case API_EVENT_ID_NETWORK_REGISTER_SEARCHING:
-            LOGI("network register searching\r\n");
+            LOGW("network register searching\r\n");
             break;
         case API_EVENT_ID_NETWORK_REGISTER_DENIED:
-            LOGI("network register denied\r\n");
+            LOGE("network register denied\r\n");
             GSM_STATUS_OFF();
             break;
         case API_EVENT_ID_NETWORK_REGISTER_NO:
             GSM_STATUS_OFF();
-            LOGI("network register no\r\n");
+            LOGE("network register no\r\n");
             break;
 
         case API_EVENT_ID_NETWORK_REGISTERED_HOME:
@@ -189,7 +189,7 @@ void EventHanler(API_Event_t* pEvent)
 
         case API_EVENT_ID_SIGNAL_QUALITY:
             g_RSSI = csq_to_percent(pEvent->param1);
-            LOGI("CSQ: %d %\r\n", g_RSSI);
+            LOGD("CSQ: %d %\r\n", g_RSSI);
             break;
 
         case API_EVENT_ID_NETWORK_CELL_INFO:
@@ -197,7 +197,7 @@ void EventHanler(API_Event_t* pEvent)
             break;
 
         case API_EVENT_ID_SYSTEM_READY:
-            LOGI("system initialize complete\r\n");
+            LOGW("system initialize complete\r\n");
             INITIALIZED_ON();
             break;
 
@@ -232,30 +232,16 @@ void gps_trackingTask(void *pData)
 {
     // wait for initialization
     // The process of GPRS registration network may cause the power supply voltage of GPS to drop, which resulting in GPS restart.
-    LOGI("Initialization ");
+    LOGI("Initialization.\r\n");
     LED_cycle_start(gpsTaskHandle);
- FsInfoTest();
-
-    while(!IS_INITIALIZED() || !IS_GSM_STATUS_ON())
-    {
-        LOGI(".");
-        OS_Sleep(2000);
-    }
-    LOGI("\r\n");
+    FsInfoTest();
 
     GPS_Info_t* gpsInfo = Gps_GetInfo();
     GPS_SaveLog(false, GPS_NMEA_LOG_FILE_PATH);
-
     // open GPS hardware(UART2 open either)
     GPS_Open(NULL);
-
-    LOGI("Waiting for GPS ");
-    while(!IS_GPS_STATUS_ON())
-    {
-        LOGI(".");
-        OS_Sleep(2000);
-    }
-    LOGI("\r\n");
+    LOGI("Waiting for GPS.\r\n ");
+    while(!IS_GPS_STATUS_ON());
 
     if(!GPS_GetVersion(responseBuffer, 255))
         LOGE("ERROR - get GPS firmware version fail.\r\n");
