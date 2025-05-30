@@ -60,14 +60,14 @@ int Https_Post(SSL_Config_t *sslConfig,
     // Calculate the required buffer size
     int bufferLen = snprintf(NULL, 0, fmt, path, hostName, dataLen, data);
     if (bufferLen <= 0) {
-        LOGE("ERROR - Failed to calculate buffer size\r\n");
+        LOGE("ERROR - Failed to calculate buffer size");
         return -1;
     }
 
     // Allocate the buffer dynamically
     char* buffer = (char*)OS_Malloc(bufferLen + 1);
     if (!buffer) {
-        LOGE("ERROR - Failed to allocate memory for HTTP package\r\n");
+        LOGE("ERROR - Failed to allocate memory for HTTP package");
         return -1;
     }
      
@@ -84,14 +84,14 @@ int Https_Post(SSL_Config_t *sslConfig,
 
     error = SSL_Init(sslConfig);
     if(error != SSL_ERROR_NONE) {
-        LOGE("ERROR - SSL init error: %d\r\n",error);
+        LOGE("ERROR - SSL init error: %d",error);
         goto err_free_buf;
     }
 
     // Connect to server
     error = SSL_Connect(sslConfig, hostName, port);
     if(error != SSL_ERROR_NONE) {
-        LOGE("ERROR - SSL connect error: %d\r\n",error);
+        LOGE("ERROR - SSL connect error: %d",error);
         goto err_ssl_destroy;
     }
 
@@ -99,7 +99,7 @@ int Https_Post(SSL_Config_t *sslConfig,
     // UART_Printf("SSL Write len:%d data:%s\r\n", bufferLen, buffer);
     error = SSL_Write(sslConfig, buffer, bufferLen, SSL_WRITE_TIMEOUT);
     if(error <= 0) {
-        LOGE("ERROR - SSL Write error: %d\r\n", error);
+        LOGE("ERROR - SSL Write error: %d", error);
         goto err_ssl_close;
     }
 
@@ -107,11 +107,11 @@ int Https_Post(SSL_Config_t *sslConfig,
     memset(retBuffer, 0, retBufferSize);
     error = SSL_Read(sslConfig, retBuffer, retBufferSize, SSL_READ_TIMEOUT);
     if(error < 0) {
-        LOGE("ERROR - SSL Read error: %d\r\n", error);
+        LOGE("ERROR - SSL Read error: %d", error);
         goto err_ssl_close;
     }
     if(error == 0) {
-        LOGE("ERROR - SSL no receive response\r\n");
+        LOGE("ERROR - SSL no receive response");
         error = SSL_ERROR_INTERNAL;
         goto err_ssl_close;
     }
@@ -120,13 +120,13 @@ int Https_Post(SSL_Config_t *sslConfig,
 err_ssl_close:
     // Close the SSL connection
     if (SSL_Close(sslConfig) != SSL_ERROR_NONE) {
-        LOGE("ERROR - ssl close error: %d\r\n", error);
+        LOGE("ERROR - ssl close error: %d", error);
     }
 
 err_ssl_destroy:
     // Destroy the SSL context
     if (SSL_Destroy(sslConfig) != SSL_ERROR_NONE) {
-        LOGE("ERROR - ssl destroy error: %d\r\n", error);
+        LOGE("ERROR - ssl destroy error: %d", error);
     } 
 
 err_free_buf:
@@ -241,7 +241,7 @@ int Http_Post(const char  *domain,
                     }
                     else if(ret < 1352)
                     {
-                        LOGI("recv len:%d, data:%s \r\n", recvLen, retBuffer);
+                        LOGI("recv len:%d, data:%s ", recvLen, retBuffer);
                         close(fd);
                         OS_Free(temp);
                         return recvLen;

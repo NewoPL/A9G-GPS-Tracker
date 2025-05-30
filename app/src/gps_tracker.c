@@ -131,65 +131,65 @@ void EventHanler(API_Event_t* pEvent)
     {
         case API_EVENT_ID_NO_SIMCARD:
             GSM_STATUS_OFF();
-            LOGE("ERROR - no sim card %d !\r\n", pEvent->param1);
+            LOGE("ERROR - no sim card %d !", pEvent->param1);
             break;
         case API_EVENT_ID_SIMCARD_DROP:
             GSM_STATUS_OFF();
-            LOGE("ERROR - sim card %d drop !\r\n",pEvent->param1);
+            LOGE("ERROR - sim card %d drop !",pEvent->param1);
             break;
         case API_EVENT_ID_NETWORK_REGISTER_SEARCHING:
-            LOGI("network register searching\r\n");
+            LOGI("network register searching");
             break;
         case API_EVENT_ID_NETWORK_REGISTER_DENIED:
-            LOGI("network register denied\r\n");
+            LOGI("network register denied");
             GSM_STATUS_OFF();
             break;
         case API_EVENT_ID_NETWORK_REGISTER_NO:
             GSM_STATUS_OFF();
-            LOGI("network register no\r\n");
+            LOGI("network register no");
             break;
 
         case API_EVENT_ID_NETWORK_REGISTERED_HOME:
         case API_EVENT_ID_NETWORK_REGISTERED_ROAMING:
-            LOGI("network register success\r\n");
+            LOGI("network register success");
             AttachActivate();
             break;
 
         case API_EVENT_ID_NETWORK_ATTACHED:
-            LOGI("network attach success\r\n");
+            LOGI("network attach success");
             AttachActivate();
             break;
 
         case API_EVENT_ID_NETWORK_ACTIVATED:
             GSM_STATUS_ON();
-            LOGI("network activate success\r\n");
+            LOGI("network activate success");
             break;
 
         case API_EVENT_ID_NETWORK_ACTIVATE_FAILED:
             GSM_STATUS_OFF();
-            LOGE("network activate failed\r\n");
+            LOGE("network activate failed");
             break;
 
         case API_EVENT_ID_NETWORK_DEACTIVED:
             GSM_STATUS_OFF(); 
-            LOGI("network deactived\r\n");
+            LOGI("network deactived");
             AttachActivate();
             break;
 
         case API_EVENT_ID_NETWORK_ATTACH_FAILED:
             GSM_STATUS_OFF();
-            LOGE("network attach failed\r\n");
+            LOGE("network attach failed");
             break;
 
         case API_EVENT_ID_NETWORK_DETACHED:
             GSM_STATUS_OFF();
-            LOGI("network detached\r\n");
+            LOGI("network detached");
             AttachActivate();
             break;
 
         case API_EVENT_ID_SIGNAL_QUALITY:
             g_RSSI = csq_to_percent(pEvent->param1);
-            LOGI("CSQ: %d %\r\n", g_RSSI);
+            LOGI("CSQ: %d %% ", g_RSSI);
             break;
 
         case API_EVENT_ID_NETWORK_CELL_INFO:
@@ -197,7 +197,7 @@ void EventHanler(API_Event_t* pEvent)
             break;
 
         case API_EVENT_ID_SYSTEM_READY:
-            LOGI("system initialize complete\r\n");
+            LOGI("system initialize complete");
             INITIALIZED_ON();
             break;
 
@@ -234,14 +234,14 @@ void gps_trackingTask(void *pData)
     // The process of GPRS registration network may cause the power supply voltage of GPS to drop, which resulting in GPS restart.
     LOGI("Initialization ");
     LED_cycle_start(gpsTaskHandle);
- FsInfoTest();
+    FsInfoTest();
 
     while(!IS_INITIALIZED() || !IS_GSM_STATUS_ON())
     {
         LOGI(".");
         OS_Sleep(2000);
     }
-    LOGI("\r\n");
+    LOGI("");
 
     GPS_Info_t* gpsInfo = Gps_GetInfo();
     GPS_SaveLog(false, GPS_NMEA_LOG_FILE_PATH);
@@ -255,18 +255,18 @@ void gps_trackingTask(void *pData)
         LOGI(".");
         OS_Sleep(2000);
     }
-    LOGI("\r\n");
+    LOGI("");
 
     if(!GPS_GetVersion(responseBuffer, 255))
-        LOGE("ERROR - get GPS firmware version fail.\r\n");
+        LOGE("ERROR - get GPS firmware version fail.");
     else
-        LOGI("GPS firmware version: %s\r\n", responseBuffer);
+        LOGI("GPS firmware version: %s", responseBuffer);
 
 //    if(!GPS_SetSearchMode(true, true, false, true))
         //UART_Printf("ERROR - set search mode fail.\r\n");
 
     if(!GPS_SetFixMode(GPS_FIX_MODE_NORMAL))
-        LOGE("ERROR - set fix mode fail.\r\n");
+        LOGE("ERROR - set fix mode fail.");
 
     // if(!GPS_ClearLog())
     //     UART_Printf("open file error, please check tf card\r\n");
@@ -281,16 +281,16 @@ void gps_trackingTask(void *pData)
     // if(!GPS_SetSBASEnable(true))
     //     UART_Printf("enable sbas fail.\r\n");
     
-    LOGI("setting GPS LP Mode to GPS_LP_MODE_NORMAL.\r\n");
+    LOGI("setting GPS LP Mode to GPS_LP_MODE_NORMAL.");
     if(!GPS_SetLpMode(GPS_LP_MODE_SUPPER_LP))
-        LOGE("ERROR - set GPS LP mode failed.\r\n");
+        LOGE("ERROR - set GPS LP mode failed.");
 
-    LOGI("setting GPS interval to 1000 ms\r\n");
+    LOGI("setting GPS interval to 1000 ms");
     if(!GPS_SetOutputInterval(1000))
-        LOGE("ERROR - set GPS interval failed.\r\n");
+        LOGE("ERROR - set GPS interval failed.");
     
     const char *device_name = Config_GetValue(&g_ConfigStore, KEY_DEVICE_NAME, NULL, 0);
-    LOGI("Device name: %s\r\n", device_name);
+    LOGI("Device name: %s", device_name);
 
     while(1)
     {
@@ -351,30 +351,30 @@ void gps_trackingTask(void *pData)
                 if (strcmp(protocol, "https") == 0)
                 {
                     if (Https_Post(&SSLconfig, serverName, serverPort, "/", requestBuffer, strlen(requestBuffer), responseBuffer, sizeof(responseBuffer)) < 0)
-                        LOGE("FAILED to send the location to the server via HTTPS\r\n");
+                        LOGE("FAILED to send the location to the server via HTTPS");
                     else
-                        LOGI("sent location to server via HTTPS\r\n");
+                        LOGI("sent location to server via HTTPS");
                 }
                 else if (strcmp(protocol, "http") == 0)
                 {
                     if (Http_Post(serverName, atoi(serverPort), "/", requestBuffer, strlen(requestBuffer), responseBuffer, sizeof(responseBuffer)) < 0)
-                        LOGE("FAILED to send the location to the server via HTTP\r\n");
+                        LOGE("FAILED to send the location to the server via HTTP");
                     else
-                        LOGI("sent location to server via HTTP\r\n");
+                        LOGI("sent location to server via HTTP");
                 }
                 else
                 {
-                    LOGE("unknown protocol: %s\r\n", protocol);
+                    LOGE("unknown protocol: %s", protocol);
                 }
             }
             else
             {
-                LOGE("no internet\r\n");
+                LOGE("no internet");
             }
         }
         else
         {
-            LOGE("no GPS fix\r\n");
+            LOGE("no GPS fix");
         }
 
         uint32_t loop_end = time(NULL);
