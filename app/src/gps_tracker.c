@@ -48,8 +48,6 @@ SSL_Config_t SSLconfig = {
     .entropyCustom   = "GPRS"
 };
 
-// const uint8_t nmea[]="$GNGGA,000021.263,2228.7216,N,11345.5625,E,0,0,,153.3,M,-3.3,M,,*4E\r\n$GPGSA,A,1,,,,,,,,,,,,,,,*1E\r\n$BDGSA,A,1,,,,,,,,,,,,,,,*0F\r\n$GPGSV,1,1,00*79\r\n$BDGSV,1,1,00*68\r\n$GNRMC,000021.263,V,2228.7216,N,11345.5625,E,0.000,0.00,060180,,,N*5D\r\n$GNVTG,0.00,T,,M,0.000,N,0.000,K,N*2C\r\n";
-
 bool AttachActivate()
 {
     uint8_t status;
@@ -174,11 +172,11 @@ void EventHanler(API_Event_t* pEvent)
     {
         case API_EVENT_ID_NO_SIMCARD:
             GSM_STATUS_OFF();
-            LOGE("ERROR - no sim card %d !", pEvent->param1);
+            LOGE("no sim card %d !", pEvent->param1);
             break;
         case API_EVENT_ID_SIMCARD_DROP:
             GSM_STATUS_OFF();
-            LOGE("ERROR - sim card %d drop !",pEvent->param1);
+            LOGE("sim card %d drop !",pEvent->param1);
             break;
         case API_EVENT_ID_NETWORK_REGISTER_SEARCHING:
             LOGW("network register searching");
@@ -194,18 +192,18 @@ void EventHanler(API_Event_t* pEvent)
 
         case API_EVENT_ID_NETWORK_REGISTERED_HOME:
         case API_EVENT_ID_NETWORK_REGISTERED_ROAMING:
-            LOGI("network register success");
+            LOGW("network register success");
             AttachActivate();
             break;
 
         case API_EVENT_ID_NETWORK_ATTACHED:
-            LOGI("network attach success");
+            LOGW("network attach success");
             AttachActivate();
             break;
 
         case API_EVENT_ID_NETWORK_ACTIVATED:
             GSM_STATUS_ON();
-            LOGI("network activate success");
+            LOGW("network activate success");
             break;
 
         case API_EVENT_ID_NETWORK_ACTIVATE_FAILED:
@@ -215,7 +213,7 @@ void EventHanler(API_Event_t* pEvent)
 
         case API_EVENT_ID_NETWORK_DEACTIVED:
             GSM_STATUS_OFF(); 
-            LOGI("network deactived");
+            LOGE("network deactived");
             AttachActivate();
             break;
 
@@ -226,7 +224,7 @@ void EventHanler(API_Event_t* pEvent)
 
         case API_EVENT_ID_NETWORK_DETACHED:
             GSM_STATUS_OFF();
-            LOGI("network detached");
+            LOGE("network detached");
             AttachActivate();
             break;
 
@@ -289,7 +287,7 @@ void gps_trackingTask(void *pData)
     if(!GPS_GetVersion(responseBuffer, 255))
         LOGE("ERROR - get GPS firmware version fail.");
     else
-        LOGI("GPS firmware version: %s", responseBuffer);
+        LOGW("GPS firmware version: %s", responseBuffer);
 
 //    if(!GPS_SetSearchMode(true, true, false, true))
         //UART_Printf("ERROR - set search mode fail.");
@@ -382,14 +380,14 @@ void gps_trackingTask(void *pData)
                     if (Https_Post(&SSLconfig, serverName, serverPort, "/", requestBuffer, strlen(requestBuffer), responseBuffer, sizeof(responseBuffer)) < 0)
                         LOGE("FAILED to send the location to the server via HTTPS");
                     else
-                        LOGI("sent location to server via HTTPS");
+                        LOGI("sent location to %s via HTTPS", serverName);
                 }
                 else if (strcmp(protocol, "http") == 0)
                 {
                     if (Http_Post(serverName, atoi(serverPort), "/", requestBuffer, strlen(requestBuffer), responseBuffer, sizeof(responseBuffer)) < 0)
                         LOGE("FAILED to send the location to the server via HTTP");
                     else
-                        LOGI("sent location to server via HTTP");
+                        LOGI("sent location to %s via HTTP", serverName);
                 }
                 else
                 {

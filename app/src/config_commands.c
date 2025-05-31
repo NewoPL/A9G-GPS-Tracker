@@ -2,13 +2,14 @@
 #include <stdlib.h>
 
 #include <api_fs.h>
+#include <api_info.h>
 #include <api_hal_pm.h>
 
+#include "gps.h"
 #include "debug.h"
 #include "config_store.h"
 #include "config_commands.h"
 #include "gps_tracker.h"
-#include "config_store.h"
 
 typedef void (*UartCmdHandler)(char*);
 
@@ -257,6 +258,20 @@ void HandleLogLevelCommand(char* param)
     Config_SetValue(&g_ConfigStore, KEY_LOG_LEVEL, param);
     Config_Save(&g_ConfigStore, CONFIG_FILE_PATH);
     UART_Printf("Log level set to %s\r\n", param);
+}
+
+void HandleGpsLogCommand(char* param)
+{
+    param = trim_whitespace(param);
+    if (strcmp(param, "enable") == 0) {
+        GPS_SaveLog(true, GPS_NMEA_LOG_FILE_PATH);
+        UART_Printf("GPS logging enabled.\r\n");
+    } else if (strcmp(param, "disable") == 0) {
+        GPS_SaveLog(false, GPS_NMEA_LOG_FILE_PATH);
+        UART_Printf("GPS logging disabled.\r\n");
+    } else {
+        UART_Printf("Usage: gpslog <enable|disable>\r\n");
+    }
 }
 
 void HandleRestartCommand(char* args)

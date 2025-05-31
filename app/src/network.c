@@ -60,23 +60,26 @@ int Https_Post(SSL_Config_t *sslConfig,
     // Calculate the required buffer size
     int bufferLen = snprintf(NULL, 0, fmt, path, hostName, dataLen, data);
     if (bufferLen <= 0) {
-        LOGE("ERROR - Failed to calculate buffer size");
+        LOGE("Failed to calculate buffer size");
         return -1;
     }
 
     // Allocate the buffer dynamically
     char* buffer = (char*)OS_Malloc(bufferLen + 1);
     if (!buffer) {
-        LOGE("ERROR - Failed to allocate memory for HTTP package");
+        LOGE("Failed to allocate memory for HTTP package");
         return -1;
     }
      
     // Build the package
     snprintf(buffer, bufferLen, fmt, path, hostName, dataLen, data);
     buffer[bufferLen] = 0;
-//  UART_Printf("HTTP Package:\r\n");
-//  UART_Write(UART1, buffer, bufferLen);
-//  UART_Printf("\r\n");
+
+#if 0
+    UART_Printf("HTTP Package:\r\n");
+    UART_Write(UART1, buffer, bufferLen);
+    UART_Printf("\r\n");
+#endif
 
     SSL_Error_t error;
     sslConfig->caCert = ca_cert;
@@ -84,22 +87,21 @@ int Https_Post(SSL_Config_t *sslConfig,
 
     error = SSL_Init(sslConfig);
     if(error != SSL_ERROR_NONE) {
-        LOGE("ERROR - SSL init error: %d",error);
+        LOGD("SSL init error: %d", error);
         goto err_free_buf;
     }
 
     // Connect to server
     error = SSL_Connect(sslConfig, hostName, port);
     if(error != SSL_ERROR_NONE) {
-        LOGE("ERROR - SSL connect error: %d",error);
+        LOGD("SSL connect error: %d", error);
         goto err_ssl_destroy;
     }
 
     // Send package
-    // UART_Printf("SSL Write len:%d data:%s\r\n", bufferLen, buffer);
     error = SSL_Write(sslConfig, buffer, bufferLen, SSL_WRITE_TIMEOUT);
     if(error <= 0) {
-        LOGE("ERROR - SSL Write error: %d", error);
+        LOGD("SSL Write error: %d", error);
         goto err_ssl_close;
     }
 
@@ -107,26 +109,25 @@ int Https_Post(SSL_Config_t *sslConfig,
     memset(retBuffer, 0, retBufferSize);
     error = SSL_Read(sslConfig, retBuffer, retBufferSize, SSL_READ_TIMEOUT);
     if(error < 0) {
-        LOGE("ERROR - SSL Read error: %d", error);
+        LOGD("SSL Read error: %d", error);
         goto err_ssl_close;
     }
     if(error == 0) {
-        LOGE("ERROR - SSL no receive response");
+        LOGD("SSL no receive response");
         error = SSL_ERROR_INTERNAL;
         goto err_ssl_close;
     }
-    // UART_Printf("SSL Read: len:%d, data:%s\r\n", error, retBuffer);
 
 err_ssl_close:
     // Close the SSL connection
     if (SSL_Close(sslConfig) != SSL_ERROR_NONE) {
-        LOGE("ERROR - ssl close error: %d", error);
+        LOGD("SSL close error: %d", error);
     }
 
 err_ssl_destroy:
     // Destroy the SSL context
     if (SSL_Destroy(sslConfig) != SSL_ERROR_NONE) {
-        LOGE("ERROR - ssl destroy error: %d", error);
+        LOGE("SSL destroy error: %d", error);
     } 
 
 err_free_buf:
