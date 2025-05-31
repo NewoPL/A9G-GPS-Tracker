@@ -250,7 +250,7 @@ void HandleLogLevelCommand(char* param)
     UART_Printf("Log level set to %s\r\n", param);
 }
 
-void HandleConfigCommand(void)
+void HandleConfigCommand(char* args)
 {
     UART_Printf("Current configuration:\r\n");
     UART_Printf("  server      : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_TRACKING_SERVER_ADDR, NULL, 0));
@@ -264,39 +264,47 @@ void HandleConfigCommand(void)
     UART_Printf("  device_name : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_DEVICE_NAME, NULL, 0));
 }
 
-void HandleHelpCommand(void)
+void HandleHelpCommand()
 {
-    UART_Printf("Available commands:\r\n");
+    UART_Printf("\r\nAvailable commands:\r\n");
     UART_Printf("  help                   - Show this help message\r\n");
     UART_Printf("  config                 - Print all configuration\r\n");
     UART_Printf("  ls [path]              - List files in specified folder (default: /). Shows file size for files.\r\n");
     UART_Printf("  rm <file>              - Remove file at specified path\r\n");
     UART_Printf("  set <param> <value>    - Set value to a specified parameter\r\n");
     UART_Printf("  get <param>            - Print a value of a specified parameter\r\n");
-    UART_Printf("  tail <file> [bytes]    - Print last [bytes] of file (default: 500)\r\n\r\n");
+    UART_Printf("  tail <file> [bytes]    - Print last [bytes] of file (default: 500)\r\n");
+    UART_Printf("  loglevel <level>       - Set log level (error, warn, info, debug)\r\n\r\n");
     UART_Printf("  parameters are:\r\n");
     UART_Printf("     address, port, protocol, apn, apn_user, apn_pass, log_level, log_output, device_name\r\n");
 }
 
+typedef void (*UartCmdHandler)(char* args);
+
+static struct {
+    const char* cmd;
+    int prefix_len;
+    UartCmdHandler handler;
+} uart_cmd_table[] = {
+    {"config",   6, HandleConfigCommand},
+    {"ls",       2, HandleLsCommand},
+    {"rm",       2, HandleRemoveFileCommand},
+    {"set",      3, HandleSetCommand},
+    {"get",      3, HandleGetCommand},
+    {"tail",     4, HandleTailCommand},
+    {"loglevel", 8, HandleLogLevelCommand},
+};
+
 void HandleUartCommand(char* cmd)
 {
     cmd = trim_whitespace(cmd);
-
-    if (strcmp(cmd, "config") == 0) {
-        HandleConfigCommand();
-    } else if (strncmp(cmd, "ls", 2) == 0) {
-        HandleLsCommand(cmd + 2);
-    } else if (strncmp(cmd, "rm ", 3) == 0) {
-        HandleRemoveFileCommand(cmd + 3);
-    } else if (strncmp(cmd, "set ", 4) == 0) {
-        HandleSetCommand(cmd + 4);
-    } else if (strncmp(cmd, "get ", 4) == 0) {
-        HandleGetCommand(cmd + 4);
-    } else if (strncmp(cmd, "tail", 4) == 0) {
-        HandleTailCommand(cmd + 4);
-    } else if (strncmp(cmd, "loglevel ", 9) == 0) {
-        HandleLogLevelCommand(cmd + 9);
-    } else {
-        HandleHelpCommand();
+    for (unsigned i = 0; i < sizeof(uart_cmd_table)/sizeof(uart_cmd_table[0]); ++i) {
+        const char* c = uart_cmd_table[i].cmd;
+        int len = uart_cmd_table[i].prefix_len;
+        if (strncmp(cmd, c, len) == 0 && (cmd[len] == ' ' || cmd[len] == '\0')) {
+            uart_cmd_table[i].handler(cmd + len);
+            return;
+        }
     }
+    HandleHelpCommand();
 }
