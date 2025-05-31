@@ -7,7 +7,7 @@
 #include <api_hal_uart.h>
 
 #include "debug.h"
-#include "config.h"
+#include "config_commands.h"
 
 int32_t      g_log_file;
 LogLevel     g_log_level  = DEFAULT_LOG_LEVEL;

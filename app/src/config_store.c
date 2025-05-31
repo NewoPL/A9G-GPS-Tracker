@@ -1,14 +1,18 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
-#include "api_os.h"
-#include "api_fs.h"
-#include "api_charset.h"
-#include "debug.h"
 
-#include "config.h"
-#include "config_parser.h"
+#include <api_os.h>
+#include <api_fs.h>
+#include <api_charset.h>
+#include <api_info.h>
+
+#include "debug.h"
+#include "config_commands.h"
+#include "config_store.h"
 #include "gps_tracker.h"
+
+Config g_ConfigStore;
 
 char* trim_whitespace(char* str)
 {
@@ -56,7 +60,7 @@ bool Config_Load(Config* config, char* filename)
     if (!config || !filename)
         return false;
 
-    int32_t fd = API_FS_Open(filename, FS_O_RDWR, 0);
+    int32_t fd = API_FS_Open(filename, FS_O_RDWR | FS_O_CREAT, 0);
     if (fd < 0)
     {
         LOGE("Open file failed: %d", fd);
@@ -194,8 +198,7 @@ char* Config_GetValue(Config* config, const char* key, char* out_buffer, size_t 
     return NULL;
 }
 
-bool 
-Config_SetValue(Config* config, char* key, char* value) 
+bool Config_SetValue(Config* config, char* key, char* value) 
 {
     if (!config || !key || !value)
         return false;
@@ -256,3 +259,32 @@ void Config_Purge(Config* config)
 {
     config->count = 0;
 };
+
+void ConfigStore_Init()
+{
+    Config_Purge(&g_ConfigStore);
+    Config_SetValue(&g_ConfigStore, KEY_APN, DEFAULT_APN_VALUE);
+    Config_SetValue(&g_ConfigStore, KEY_APN_USER, DEFAULT_APN_USER_VALUE);
+    Config_SetValue(&g_ConfigStore, KEY_APN_PASS, DEFAULT_APN_PASS_VALUE);
+    Config_SetValue(&g_ConfigStore, KEY_TRACKING_SERVER_ADDR, DEFAULT_TRACKING_SERVER_ADDR);
+    Config_SetValue(&g_ConfigStore, KEY_TRACKING_SERVER_PORT, DEFAULT_TRACKING_SERVER_PORT);
+    Config_SetValue(&g_ConfigStore, KEY_TRACKING_SERVER_PROTOCOL, DEFAULT_TRACKING_SERVER_PROTOCOL);
+    Config_SetValue(&g_ConfigStore, KEY_LOG_LEVEL, log_level_to_string(LOG_LEVEL_INFO));
+    Config_SetValue(&g_ConfigStore, KEY_LOG_OUTPUT, "UART");
+
+    if (!Config_Load(&g_ConfigStore, CONFIG_FILE_PATH))
+    {
+        LOGE("ERROR - load config file");
+    }
+
+    char *device_name = Config_GetValue(&g_ConfigStore, KEY_DEVICE_NAME, NULL, 0);
+    if ((device_name == NULL) || (device_name[0]='\0'))
+    {
+        char IMEI[16];
+        memset(IMEI, 0, sizeof(IMEI));
+        if(INFO_GetIMEI(IMEI))
+            Config_SetValue(&g_ConfigStore, KEY_DEVICE_NAME, IMEI);
+        else
+            Config_SetValue(&g_ConfigStore, KEY_DEVICE_NAME, DEFAULT_DEVICE_NAME);    
+    }
+}

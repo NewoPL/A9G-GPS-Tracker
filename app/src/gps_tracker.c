@@ -20,8 +20,8 @@
 #include "system.h"
 #include "gps_tracker.h"
 #include "network.h"
-#include "config.h"
-#include "config_parser.h"
+#include "config_commands.h"
+#include "config_store.h"
 #include "led_handler.h"
 #include "debug.h"
 

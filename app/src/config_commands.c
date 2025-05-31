@@ -2,13 +2,13 @@
 #include <stdlib.h>
 
 #include <api_fs.h>
-#include <api_info.h>
 #include <api_hal_pm.h>
 
 #include "debug.h"
-#include "config.h"
-#include "config_parser.h"
+#include "config_store.h"
+#include "config_commands.h"
 #include "gps_tracker.h"
+#include "config_store.h"
 
 typedef void (*UartCmdHandler)(char*);
 
@@ -38,40 +38,9 @@ static struct uart_cmd_entry uart_cmd_table[] = {
     {"set",      3, HandleSetCommand,        "set <param> [value]", "Set value to a specified parameter. if no value provided parameter will be cleared."},
     {"get",      3, HandleGetCommand,        "get <param>",         "Print a value of a specified parameter"},
     {"tail",     4, HandleTailCommand,       "tail <file> [bytes]", "Print last [bytes] of file (default: 500)"},
-    {"loglevel", 8, HandleLogLevelCommand,   "loglevel <level>",    "Set log level (error, warn, info, debug)"},
+    {"loglevel", 8, HandleLogLevelCommand,   "loglevel [level]",    "Set or print log level (error, warn, info, debug)"},
     {"restart",  7, HandleRestartCommand,    "restart",             "Restart the system immediately"},
 };
-
-Config g_ConfigStore;
-
-void ConfigStore_Init()
-{
-    Config_Purge(&g_ConfigStore);
-    Config_SetValue(&g_ConfigStore, KEY_APN, DEFAULT_APN_VALUE);
-    Config_SetValue(&g_ConfigStore, KEY_APN_USER, DEFAULT_APN_USER_VALUE);
-    Config_SetValue(&g_ConfigStore, KEY_APN_PASS, DEFAULT_APN_PASS_VALUE);
-    Config_SetValue(&g_ConfigStore, KEY_TRACKING_SERVER_ADDR, DEFAULT_TRACKING_SERVER_ADDR);
-    Config_SetValue(&g_ConfigStore, KEY_TRACKING_SERVER_PORT, DEFAULT_TRACKING_SERVER_PORT);
-    Config_SetValue(&g_ConfigStore, KEY_TRACKING_SERVER_PROTOCOL, DEFAULT_TRACKING_SERVER_PROTOCOL);
-    Config_SetValue(&g_ConfigStore, KEY_LOG_LEVEL, log_level_to_string(LOG_LEVEL_INFO));
-    Config_SetValue(&g_ConfigStore, KEY_LOG_OUTPUT, "UART");
-
-    if (!Config_Load(&g_ConfigStore, CONFIG_FILE_PATH))
-    {
-        LOGE("ERROR - load config file");
-    }
-
-    char *device_name = Config_GetValue(&g_ConfigStore, KEY_DEVICE_NAME, NULL, 0);
-    if ((device_name == NULL) || (device_name[0]='\0'))
-    {
-        char IMEI[16];
-        memset(IMEI, 0, sizeof(IMEI));
-        if(INFO_GetIMEI(IMEI))
-            Config_SetValue(&g_ConfigStore, KEY_DEVICE_NAME, IMEI);
-        else
-            Config_SetValue(&g_ConfigStore, KEY_DEVICE_NAME, DEFAULT_DEVICE_NAME);    
-    }
-}
 
 static const char* get_config_key_by_param(const char* param)
 {
@@ -278,7 +247,9 @@ void HandleLogLevelCommand(char* param)
 {
     param = trim_whitespace(param);
     if (!param || !*param) {
-        UART_Printf("missing log level\r\n");
+        // Print current log level if no argument is given
+        const char* current = Config_GetValue(&g_ConfigStore, KEY_LOG_LEVEL, NULL, 0);
+        UART_Printf("Current log level: %s\r\n", current ? current : "unknown");
         return;
     }
     LogLevel level = log_level_to_int(param);
