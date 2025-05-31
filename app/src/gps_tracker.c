@@ -214,7 +214,6 @@ void EventHanler(API_Event_t* pEvent)
         case API_EVENT_ID_NETWORK_DEACTIVED:
             GSM_STATUS_OFF(); 
             LOGE("network deactived");
-            AttachActivate();
             break;
 
         case API_EVENT_ID_NETWORK_ATTACH_FAILED:
@@ -225,7 +224,6 @@ void EventHanler(API_Event_t* pEvent)
         case API_EVENT_ID_NETWORK_DETACHED:
             GSM_STATUS_OFF();
             LOGE("network detached");
-            AttachActivate();
             break;
 
         case API_EVENT_ID_SIGNAL_QUALITY:

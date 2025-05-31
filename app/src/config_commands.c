@@ -22,6 +22,7 @@ void HandleGetCommand(char*);
 void HandleTailCommand(char*);
 void HandleLogLevelCommand(char*);
 void HandleRestartCommand(char*);
+void HandleNetworkActivateCommand(char*);
 
 struct uart_cmd_entry {
     const char* cmd;
@@ -41,6 +42,7 @@ static struct uart_cmd_entry uart_cmd_table[] = {
     {"tail",     4, HandleTailCommand,       "tail <file> [bytes]", "Print last [bytes] of file (default: 500)"},
     {"loglevel", 8, HandleLogLevelCommand,   "loglevel [level]",    "Set or print log level (error, warn, info, debug)"},
     {"restart",  7, HandleRestartCommand,    "restart",             "Restart the system immediately"},
+    {"netactivate", 11, HandleNetworkActivateCommand, "netactivate", "Activate (attach and activate) the network"},
 };
 
 static const char* get_config_key_by_param(const char* param)
@@ -278,6 +280,17 @@ void HandleRestartCommand(char* args)
 {
     UART_Printf("System restarting...\r\n");
     PM_Restart();
+}
+
+bool AttachActivate();
+
+void HandleNetworkActivateCommand(char* param)
+{
+    if (AttachActivate()) {
+        UART_Printf("Network activated.\r\n");
+    } else {
+        UART_Printf("Network activation failed.\r\n");
+    }
 }
 
 void HandleConfigCommand(char* args)
