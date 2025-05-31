@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <stdlib.h>
+
 #include <api_fs.h>
 #include <api_info.h>
 
@@ -9,28 +11,46 @@
 
 Config g_ConfigStore;
 
+static void format_size(char* buf, size_t bufsize, int value, const char* label) {
+    if (value >= 1024*1024*1024) {
+        float gb = value / (1024.0f * 1024.0f * 1024.0f);
+        snprintf(buf, bufsize, "%s%.3f GB", label, gb);
+    } else if (value >= 1024*1024) {
+        float mb = value / (1024.0f * 1024.0f);
+        snprintf(buf, bufsize, "%s%.3f MB", label, mb);
+    } else if (value >= 1024) {
+        float kb = value / 1024.0f;
+        snprintf(buf, bufsize, "%s%.3f KB", label, kb);
+    } else {
+        snprintf(buf, bufsize, "%s%d Bytes", label, value);
+    }
+}
+
 void FsInfoTest()
 {
     API_FS_INFO fsInfo;
     int sizeUsed = 0, sizeTotal = 0;
+    char used_buf[32], total_buf[32];
 
-    LOGI("Start Fs info test!");
-    
     if(API_FS_GetFSInfo(FS_DEVICE_NAME_FLASH, &fsInfo) < 0)
     {
-        LOGE("Get FS Flash device info fail!");
+        LOGE("Get Int Flash device info fail!");
     }
     sizeUsed  = fsInfo.usedSize;
     sizeTotal = fsInfo.totalSize;
-    LOGI("flash used:%d Bytes, total size:%d Bytes",sizeUsed,sizeTotal);
+    format_size(used_buf, sizeof(used_buf), sizeUsed, "");
+    format_size(total_buf, sizeof(total_buf), sizeTotal, "");
+    LOGI("Int Flash used: %s, total size: %s", used_buf, total_buf);
+
     if(API_FS_GetFSInfo(FS_DEVICE_NAME_T_FLASH, &fsInfo) < 0)
     {
-        LOGE("Get FS T Flash device info fail!");
+        LOGE("Get Ext Flash device info fail!");
     }
     sizeUsed  = fsInfo.usedSize;
     sizeTotal = fsInfo.totalSize;
-    float mb = sizeTotal/1024.0/1024.0;
-    LOGI("T Flash used:%d Bytes, total size:%d Bytes(%d.%03d MB)",sizeUsed,sizeTotal,(int)mb, (int)((mb-(int)mb)*1000)  );
+    format_size(used_buf, sizeof(used_buf), sizeUsed, "");
+    format_size(total_buf, sizeof(total_buf), sizeTotal, "");
+    LOGI("Ext Flash used: %s, total size: %s", used_buf, total_buf);
 }
 
 void ConfigStore_Init()
@@ -67,9 +87,11 @@ void HandleHelpCommand(void)
     UART_Printf("Available commands:\r\n");
     UART_Printf("  help                   - Show this help message\r\n");
     UART_Printf("  show config            - Print all configuration\r\n");
-    UART_Printf("  show files [path]      - List files in specified folder (default: /)\r\n");
-    UART_Printf("  set <param> <value>    - Set value to a specied parameter\r\n");
-    UART_Printf("  get <param>            - Print a value of a specified parameter\r\n\r\n");
+    UART_Printf("  ls [path]              - List files in specified folder (default: /). Shows file size for files.\r\n");
+    UART_Printf("  rm <file>              - Remove file at specified path\r\n");
+    UART_Printf("  set <param> <value>    - Set value to a specified parameter\r\n");
+    UART_Printf("  get <param>            - Print a value of a specified parameter\r\n");
+    UART_Printf("  tail <file> [bytes]    - Print last [bytes] of file (default: 500)\r\n\r\n");
     UART_Printf("  parameters are:\r\n");
     UART_Printf("     address, port, protocol, apn, apn_user, apn_pass, log_level, log_output, device_name\r\n");
 }
@@ -95,54 +117,63 @@ static const char* get_config_key_by_param(const char* param)
     return NULL;
 }
 
-void HandleSetCommand(char* args)
+void HandleSetCommand(char* param)
 {
-    char buffer[128];
-    strncpy(buffer, args, sizeof(buffer) - 1);
-    buffer[sizeof(buffer) - 1] = '\0';
+    param = trim_whitespace(param);
+    char* field = strtok(param, " ");
+    if (!field) {
+        UART_Printf("missing variable\r\n");
+        return;
+    }
 
-    char* field = strtok(buffer, " ");
     char* value = strtok(NULL, "");
-
-    if (!field || !value) {
-        UART_Printf("ERROR - set wrong parameters\r\n");
+    if (!value) {
+        UART_Printf("missing value to set\r\n");
         return;
     }
 
     const char* key = get_config_key_by_param(field);
-
-    if (key) {
-        if (Config_SetValue(&g_ConfigStore, (char*)key, value)) {
-            LOGI("Set %s to %s", field, value);
-            if (!Config_Save(&g_ConfigStore, CONFIG_FILE_PATH))
-                LOGE("Failed to save config file");    
-        } else {
-            LOGE("Failed to set %s", field);
-        }
-    } else {
-        UART_Printf("ERROR - unknown parameter %s\r\n", field);
-    }
-}
-
-void HandleGetCommand(char* args)
-{
-    char buffer[128];
-    strncpy(buffer, args, sizeof(buffer) - 1);
-    buffer[sizeof(buffer) - 1] = '\0';
-    char* param = trim_whitespace(buffer);
-    const char* key = get_config_key_by_param(param);
-
-    if (key) {
-        const char* value = Config_GetValue(&g_ConfigStore, key, NULL, 0);
-        if (value) {
-            UART_Printf("%s: %s\r\n", param, value);
-        } else {
-            UART_Printf("parameter %s is not configured.\r\n", param);
-        }
-    } else {
-        UART_Printf("ERROR - unknown parameter %s\r\n", param);
+    if (!key) {
+        UART_Printf("unknown variable\r\n");
         return;
     }
+
+    if (Config_SetValue(&g_ConfigStore, (char*)key, value))
+    {
+        LOGI("Set %s to %s", field, value);
+        if (!Config_Save(&g_ConfigStore, CONFIG_FILE_PATH))
+            LOGE("Failed to save config file");    
+    }
+    else
+    {
+        LOGE("Failed to set %s", field);
+    }
+    
+    return;
+}
+
+void HandleGetCommand(char* param)
+{
+    char* field = trim_whitespace(param);
+    if (!field) {
+        UART_Printf("missing variable\r\n");
+        return;
+    }
+
+    const char* key = get_config_key_by_param(param);
+    if (!key) {
+        UART_Printf("unknown variable\r\n");
+        return;
+    }
+
+    const char* value = Config_GetValue(&g_ConfigStore, key, NULL, 0);
+    if (value) {
+        UART_Printf("%s: %s\r\n", param, value);
+    } else {
+        UART_Printf("variable %s is not set.\r\n", param);
+    }
+    
+    return;
 }
 
 void HandleConfigCommand(void)
@@ -159,39 +190,112 @@ void HandleConfigCommand(void)
     UART_Printf("  device_name : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_DEVICE_NAME, NULL, 0));
 }
 
-void HandleShowFilesCommand(char* path)
+void HandleLsCommand(char* path)
 {
-    if (!path || path[0] == '\0') path = "/";
     path = trim_whitespace(path);
-    UART_Printf("Files in %s:\r\n", path);
+    if (!path || path[0] == '\0') path = "/";
+
+    UART_Printf("File list in %s:\r\n", path);
     Dir_t* dir = API_FS_OpenDir(path);
     if (!dir) {
         UART_Printf("cannot open directory: %s\r\n", path);
         return;
     }
-    Dirent_t* dirent = NULL;
-    while ((dirent = API_FS_ReadDir(dir))) {
-        char *file_type = NULL;
-        char  file_path[256];
-        int   file_size = 0;
 
-        if (dirent->d_type == 8) file_type = "<file>";
-        else if (dirent->d_type == 4) file_type = "<dir>";
-        else file_type = "<unknown>";
-        
-        snprintf(file_path, sizeof(file_path),"%s%s",path,dirent->d_name);
-        
-        int32_t fd = API_FS_Open(file_path, FS_O_RDONLY, 0);
-        if(fd < 0)
-            LOGE("open file %s fail", file_path);
-        else
+    char file_path[256];
+    strncpy(file_path, path, sizeof(file_path) - 1);
+    file_path[sizeof(file_path) - 1] = '\0';
+    size_t base_path_len = strlen(file_path);
+
+    Dirent_t* dirent = NULL;
+
+    while ((dirent = API_FS_ReadDir(dir)))
+    {
+        if (dirent->d_type == 8)
         {
-            file_size = (int)API_FS_GetFileSize(fd);
-            API_FS_Close(fd);
+            int file_size = 0;
+            strncpy(file_path + base_path_len, dirent->d_name, sizeof(file_path) - base_path_len - 1);
+            file_path[base_path_len + strlen(dirent->d_name)] = '\0';
+            int32_t fd = API_FS_Open(file_path, FS_O_RDONLY, 0);
+            if(fd < 0)
+                LOGE("open file %s fail", file_path);
+            else
+            {
+                file_size = (int)API_FS_GetFileSize(fd);
+                API_FS_Close(fd);
+            }
+            UART_Printf("<file>  %s  %d\r\n", dirent->d_name, file_size);
+        } else if (dirent->d_type == 4) {
+            UART_Printf("<dir>  %s\r\n", dirent->d_name);
         }
-        UART_Printf("%s  %s\r\n", file_type, file_path);
+        else 
+            UART_Printf("<unknown>\r\n");
     }
     API_FS_CloseDir(dir);
+}
+
+void HandleRemoveFileCommand(char* path)
+{
+    path = trim_whitespace(path);
+    if (!path || path[0] == '\0') {
+        UART_Printf("no file specified\r\n");
+        return;
+    }
+    int result = API_FS_Delete(path);
+    if (result == 0) {
+        UART_Printf("File deleted: %s\r\n", path);
+    } else {
+        UART_Printf("failed to delete file: %s\r\n", path);
+    }
+}
+
+void HandleTailCommand(char* args)
+{
+    int bytes = 500;
+    char* file_path = trim_whitespace(args);
+    if (!file_path || !*file_path) {
+        UART_Printf("missing file\r\n");
+        return;
+    }
+
+    char* space = strchr(file_path, ' ');
+    if (space) {
+        *space = '\0';
+        char* bytes_str = trim_whitespace(space + 1);
+        if (bytes_str && *bytes_str) {
+            int val = atoi(bytes_str);
+            if (val > 0) bytes = val;
+        }
+    }
+
+    int32_t fd = API_FS_Open(file_path, FS_O_RDONLY, 0);
+    if (fd < 0) {
+        UART_Printf("tail: cannot open file %s\r\n", file_path);
+        return;
+    }
+    int file_size = (int)API_FS_GetFileSize(fd);
+    if (file_size < 0) {
+        UART_Printf("tail: cannot get file size\r\n");
+        API_FS_Close(fd);
+        return;
+    }
+    int start = file_size > bytes ? file_size - bytes : 0;
+    if (API_FS_Seek(fd, start, 0) < 0) {
+        UART_Printf("tail: seek error\r\n");
+        API_FS_Close(fd);
+        return;
+    }
+    char buf[128];
+    int remaining = file_size - start;
+    while (remaining > 0) {
+        int to_read = remaining > (int)sizeof(buf) ? (int)sizeof(buf) : remaining;
+        int n = API_FS_Read(fd, buf, to_read);
+        if (n <= 0) break;
+        for (int i = 0; i < n; ++i) UART_Printf("%c", buf[i]);
+        remaining -= n;
+    }
+    UART_Printf("\r\n");
+    API_FS_Close(fd);
 }
 
 void HandleUartCommand(char* cmd)
@@ -200,12 +304,16 @@ void HandleUartCommand(char* cmd)
 
     if (strcmp(cmd, "config") == 0) {
         HandleConfigCommand();
-    } else if (strncmp(cmd, "show files", 10) == 0) {
-        HandleShowFilesCommand(cmd + 10);
+    } else if (strncmp(cmd, "ls", 2) == 0) {
+        HandleLsCommand(cmd + 2);
+    } else if (strncmp(cmd, "rm ", 3) == 0) {
+        HandleRemoveFileCommand(cmd + 3);
     } else if (strncmp(cmd, "set ", 4) == 0) {
         HandleSetCommand(cmd + 4);
     } else if (strncmp(cmd, "get ", 4) == 0) {
         HandleGetCommand(cmd + 4);
+    } else if (strncmp(cmd, "tail", 4) == 0) {
+        HandleTailCommand(cmd + 4);
     } else {
         HandleHelpCommand();
     }
