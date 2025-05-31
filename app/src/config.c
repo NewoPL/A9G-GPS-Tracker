@@ -9,6 +9,36 @@
 #include "config_parser.h"
 #include "gps_tracker.h"
 
+typedef void (*UartCmdHandler)(char*);
+
+void HandleHelpCommand(char*);
+void HandleConfigCommand(char*);
+void HandleLsCommand(char*);
+void HandleRemoveFileCommand(char*);
+void HandleSetCommand(char*);
+void HandleGetCommand(char*);
+void HandleTailCommand(char*);
+void HandleLogLevelCommand(char*);
+
+struct uart_cmd_entry {
+    const char* cmd;
+    int cmd_len;
+    UartCmdHandler handler;
+    const char* syntax;
+    const char* help;
+};
+
+static struct uart_cmd_entry uart_cmd_table[] = {
+    {"help",     4, HandleHelpCommand,       "help",                "Show this help message"},
+    {"config",   6, HandleConfigCommand,     "config",              "Print all configuration"},
+    {"ls",       2, HandleLsCommand,         "ls [path]",           "List files in specified folder (default: /)"},
+    {"rm",       2, HandleRemoveFileCommand, "rm <file>",           "Remove file at specified path"},
+    {"set",      3, HandleSetCommand,        "set <param> [value]", "Set value to a specified parameter. if no value provided parameter will be cleared."},
+    {"get",      3, HandleGetCommand,        "get <param>",         "Print a value of a specified parameter"},
+    {"tail",     4, HandleTailCommand,       "tail <file> [bytes]", "Print last [bytes] of file (default: 500)"},
+    {"loglevel", 8, HandleLogLevelCommand,   "loglevel <level>",    "Set log level (error, warn, info, debug)"},
+};
+
 Config g_ConfigStore;
 
 void ConfigStore_Init()
@@ -64,16 +94,21 @@ static const char* get_config_key_by_param(const char* param)
 void HandleSetCommand(char* param)
 {
     param = trim_whitespace(param);
-    char* field = strtok(param, " ");
-    if (!field) {
+    if (!*param) {
         UART_Printf("missing variable\r\n");
         return;
     }
 
-    char* value = strtok(NULL, "");
-    if (!value) {
-        UART_Printf("missing value to set\r\n");
-        return;
+    // Find the first space (if any)
+    char* space = strchr(param, ' ');
+    char* field = param;
+    char* value = NULL;
+    if (space) {
+        *space = '\0';
+        value = space + 1;
+    } else {
+        // No value provided, set to empty string
+        value = (char*)"";
     }
 
     const char* key = get_config_key_by_param(field);
@@ -84,7 +119,7 @@ void HandleSetCommand(char* param)
 
     if (Config_SetValue(&g_ConfigStore, (char*)key, value))
     {
-        LOGI("Set %s to %s", field, value);
+        LOGI("Set %s to '%s'", field, value);
         if (!Config_Save(&g_ConfigStore, CONFIG_FILE_PATH))
             LOGE("Failed to save config file");    
     }
@@ -264,47 +299,27 @@ void HandleConfigCommand(char* args)
     UART_Printf("  device_name : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_DEVICE_NAME, NULL, 0));
 }
 
-void HandleHelpCommand()
+void HandleHelpCommand(char* args)
 {
     UART_Printf("\r\nAvailable commands:\r\n");
-    UART_Printf("  help                   - Show this help message\r\n");
-    UART_Printf("  config                 - Print all configuration\r\n");
-    UART_Printf("  ls [path]              - List files in specified folder (default: /). Shows file size for files.\r\n");
-    UART_Printf("  rm <file>              - Remove file at specified path\r\n");
-    UART_Printf("  set <param> <value>    - Set value to a specified parameter\r\n");
-    UART_Printf("  get <param>            - Print a value of a specified parameter\r\n");
-    UART_Printf("  tail <file> [bytes]    - Print last [bytes] of file (default: 500)\r\n");
-    UART_Printf("  loglevel <level>       - Set log level (error, warn, info, debug)\r\n\r\n");
-    UART_Printf("  parameters are:\r\n");
+    for (unsigned i = 0; i < sizeof(uart_cmd_table)/sizeof(uart_cmd_table[0]); ++i) {
+        UART_Printf("  %-24s- %s\r\n", uart_cmd_table[i].syntax, uart_cmd_table[i].help);
+    }
+    UART_Printf("\r\n  <param> is one of:\r\n");
     UART_Printf("     address, port, protocol, apn, apn_user, apn_pass, log_level, log_output, device_name\r\n");
 }
 
-typedef void (*UartCmdHandler)(char* args);
-
-static struct {
-    const char* cmd;
-    int prefix_len;
-    UartCmdHandler handler;
-} uart_cmd_table[] = {
-    {"config",   6, HandleConfigCommand},
-    {"ls",       2, HandleLsCommand},
-    {"rm",       2, HandleRemoveFileCommand},
-    {"set",      3, HandleSetCommand},
-    {"get",      3, HandleGetCommand},
-    {"tail",     4, HandleTailCommand},
-    {"loglevel", 8, HandleLogLevelCommand},
-};
 
 void HandleUartCommand(char* cmd)
 {
     cmd = trim_whitespace(cmd);
     for (unsigned i = 0; i < sizeof(uart_cmd_table)/sizeof(uart_cmd_table[0]); ++i) {
         const char* c = uart_cmd_table[i].cmd;
-        int len = uart_cmd_table[i].prefix_len;
+        int len = uart_cmd_table[i].cmd_len;
         if (strncmp(cmd, c, len) == 0 && (cmd[len] == ' ' || cmd[len] == '\0')) {
             uart_cmd_table[i].handler(cmd + len);
             return;
         }
     }
-    HandleHelpCommand();
+    UART_Printf("Unknown command. Type 'help' to see available commands.\r\n");
 }
