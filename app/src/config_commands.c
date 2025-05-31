@@ -114,7 +114,7 @@ void HandleGetCommand(char* param)
         return;
     }
 
-    const char* key = get_config_key_by_param(param);
+    const char* key = get_config_key_by_param(field);
     if (!key) {
         UART_Printf("unknown variable\r\n");
         return;

@@ -274,7 +274,7 @@ void ConfigStore_Init()
 
     if (!Config_Load(&g_ConfigStore, CONFIG_FILE_PATH))
     {
-        LOGE("ERROR - load config file");
+        LOGE("load config file failed");
     }
 
     char *device_name = Config_GetValue(&g_ConfigStore, KEY_DEVICE_NAME, NULL, 0);
