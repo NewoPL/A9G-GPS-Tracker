@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <ctype.h>
 #include <stdarg.h>
 #include <string.h>
 
@@ -21,6 +22,26 @@ char* log_level_to_string(LogLevel level)
         case LOG_LEVEL_DEBUG: return "DEBUG";
         default:              return "UNKNOWN";
     }
+}
+
+LogLevel log_level_to_int(const char* str)
+{
+    char buf[16];
+    size_t i;
+    for (i = 0; i < sizeof(buf) - 1 && str[i]; ++i)
+        buf[i] = toupper((unsigned char)str[i]);
+    buf[i] = '\0';
+
+    if (strcmp(buf, "ERROR") == 0)
+        return LOG_LEVEL_ERROR;
+    else if (strcmp(buf, "WARN") == 0)
+        return LOG_LEVEL_WARN;
+    else if (strcmp(buf, "INFO") == 0)
+        return LOG_LEVEL_INFO;
+    else if (strcmp(buf, "DEBUG") == 0)
+        return LOG_LEVEL_DEBUG;
+    else
+        return LOG_LEVEL_NONE;
 }
 
 void set_log_level(LogLevel level) {

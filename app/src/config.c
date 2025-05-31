@@ -11,48 +11,6 @@
 
 Config g_ConfigStore;
 
-static void format_size(char* buf, size_t bufsize, int value, const char* label) {
-    if (value >= 1024*1024*1024) {
-        float gb = value / (1024.0f * 1024.0f * 1024.0f);
-        snprintf(buf, bufsize, "%s%.3f GB", label, gb);
-    } else if (value >= 1024*1024) {
-        float mb = value / (1024.0f * 1024.0f);
-        snprintf(buf, bufsize, "%s%.3f MB", label, mb);
-    } else if (value >= 1024) {
-        float kb = value / 1024.0f;
-        snprintf(buf, bufsize, "%s%.3f KB", label, kb);
-    } else {
-        snprintf(buf, bufsize, "%s%d Bytes", label, value);
-    }
-}
-
-void FsInfoTest()
-{
-    API_FS_INFO fsInfo;
-    int sizeUsed = 0, sizeTotal = 0;
-    char used_buf[32], total_buf[32];
-
-    if(API_FS_GetFSInfo(FS_DEVICE_NAME_FLASH, &fsInfo) < 0)
-    {
-        LOGE("Get Int Flash device info fail!");
-    }
-    sizeUsed  = fsInfo.usedSize;
-    sizeTotal = fsInfo.totalSize;
-    format_size(used_buf, sizeof(used_buf), sizeUsed, "");
-    format_size(total_buf, sizeof(total_buf), sizeTotal, "");
-    LOGI("Int Flash used: %s, total size: %s", used_buf, total_buf);
-
-    if(API_FS_GetFSInfo(FS_DEVICE_NAME_T_FLASH, &fsInfo) < 0)
-    {
-        LOGE("Get Ext Flash device info fail!");
-    }
-    sizeUsed  = fsInfo.usedSize;
-    sizeTotal = fsInfo.totalSize;
-    format_size(used_buf, sizeof(used_buf), sizeUsed, "");
-    format_size(total_buf, sizeof(total_buf), sizeTotal, "");
-    LOGI("Ext Flash used: %s, total size: %s", used_buf, total_buf);
-}
-
 void ConfigStore_Init()
 {
     Config_Purge(&g_ConfigStore);
@@ -80,20 +38,6 @@ void ConfigStore_Init()
         else
             Config_SetValue(&g_ConfigStore, KEY_DEVICE_NAME, DEFAULT_DEVICE_NAME);    
     }
-}
-
-void HandleHelpCommand(void)
-{
-    UART_Printf("Available commands:\r\n");
-    UART_Printf("  help                   - Show this help message\r\n");
-    UART_Printf("  show config            - Print all configuration\r\n");
-    UART_Printf("  ls [path]              - List files in specified folder (default: /). Shows file size for files.\r\n");
-    UART_Printf("  rm <file>              - Remove file at specified path\r\n");
-    UART_Printf("  set <param> <value>    - Set value to a specified parameter\r\n");
-    UART_Printf("  get <param>            - Print a value of a specified parameter\r\n");
-    UART_Printf("  tail <file> [bytes]    - Print last [bytes] of file (default: 500)\r\n\r\n");
-    UART_Printf("  parameters are:\r\n");
-    UART_Printf("     address, port, protocol, apn, apn_user, apn_pass, log_level, log_output, device_name\r\n");
 }
 
 static const char* get_config_key_by_param(const char* param)
@@ -176,20 +120,6 @@ void HandleGetCommand(char* param)
     return;
 }
 
-void HandleConfigCommand(void)
-{
-    UART_Printf("Current configuration:\r\n");
-    UART_Printf("  server      : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_TRACKING_SERVER_ADDR, NULL, 0));
-    UART_Printf("  port        : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_TRACKING_SERVER_PORT, NULL, 0));
-    UART_Printf("  protocol    : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_TRACKING_SERVER_PROTOCOL, NULL, 0));
-    UART_Printf("  apn         : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_APN, NULL, 0));
-    UART_Printf("  apn_user    : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_APN_USER, NULL, 0));
-    UART_Printf("  apn_pass    : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_APN_PASS, NULL, 0));
-    UART_Printf("  log_level   : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_LOG_LEVEL, NULL, 0));
-    UART_Printf("  log_output  : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_LOG_OUTPUT, NULL, 0));
-    UART_Printf("  device_name : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_DEVICE_NAME, NULL, 0));
-}
-
 void HandleLsCommand(char* path)
 {
     path = trim_whitespace(path);
@@ -206,6 +136,14 @@ void HandleLsCommand(char* path)
     strncpy(file_path, path, sizeof(file_path) - 1);
     file_path[sizeof(file_path) - 1] = '\0';
     size_t base_path_len = strlen(file_path);
+    // Ensure file_path ends with '/'
+    if (base_path_len == 0 || file_path[base_path_len - 1] != '/') {
+        if (base_path_len < sizeof(file_path) - 1) {
+            file_path[base_path_len] = '/';
+            file_path[base_path_len + 1] = '\0';
+            base_path_len++;
+        }
+    }
 
     Dirent_t* dirent = NULL;
 
@@ -224,9 +162,9 @@ void HandleLsCommand(char* path)
                 file_size = (int)API_FS_GetFileSize(fd);
                 API_FS_Close(fd);
             }
-            UART_Printf("<file>  %s  %d\r\n", dirent->d_name, file_size);
+            UART_Printf("<file>  %-*s  %8d\r\n", 20, dirent->d_name, file_size);
         } else if (dirent->d_type == 4) {
-            UART_Printf("<dir>  %s\r\n", dirent->d_name);
+            UART_Printf("<dir>   %-*s\r\n", 20, dirent->d_name);
         }
         else 
             UART_Printf("<unknown>\r\n");
@@ -298,6 +236,48 @@ void HandleTailCommand(char* args)
     API_FS_Close(fd);
 }
 
+void HandleLogLevelCommand(char* param)
+{
+    param = trim_whitespace(param);
+    if (!param || !*param) {
+        UART_Printf("missing log level\r\n");
+        return;
+    }
+    LogLevel level = log_level_to_int(param);
+    set_log_level(level);
+    Config_SetValue(&g_ConfigStore, KEY_LOG_LEVEL, param);
+    Config_Save(&g_ConfigStore, CONFIG_FILE_PATH);
+    UART_Printf("Log level set to %s\r\n", param);
+}
+
+void HandleConfigCommand(void)
+{
+    UART_Printf("Current configuration:\r\n");
+    UART_Printf("  server      : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_TRACKING_SERVER_ADDR, NULL, 0));
+    UART_Printf("  port        : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_TRACKING_SERVER_PORT, NULL, 0));
+    UART_Printf("  protocol    : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_TRACKING_SERVER_PROTOCOL, NULL, 0));
+    UART_Printf("  apn         : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_APN, NULL, 0));
+    UART_Printf("  apn_user    : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_APN_USER, NULL, 0));
+    UART_Printf("  apn_pass    : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_APN_PASS, NULL, 0));
+    UART_Printf("  log_level   : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_LOG_LEVEL, NULL, 0));
+    UART_Printf("  log_output  : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_LOG_OUTPUT, NULL, 0));
+    UART_Printf("  device_name : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_DEVICE_NAME, NULL, 0));
+}
+
+void HandleHelpCommand(void)
+{
+    UART_Printf("Available commands:\r\n");
+    UART_Printf("  help                   - Show this help message\r\n");
+    UART_Printf("  config                 - Print all configuration\r\n");
+    UART_Printf("  ls [path]              - List files in specified folder (default: /). Shows file size for files.\r\n");
+    UART_Printf("  rm <file>              - Remove file at specified path\r\n");
+    UART_Printf("  set <param> <value>    - Set value to a specified parameter\r\n");
+    UART_Printf("  get <param>            - Print a value of a specified parameter\r\n");
+    UART_Printf("  tail <file> [bytes]    - Print last [bytes] of file (default: 500)\r\n\r\n");
+    UART_Printf("  parameters are:\r\n");
+    UART_Printf("     address, port, protocol, apn, apn_user, apn_pass, log_level, log_output, device_name\r\n");
+}
+
 void HandleUartCommand(char* cmd)
 {
     cmd = trim_whitespace(cmd);
@@ -314,6 +294,8 @@ void HandleUartCommand(char* cmd)
         HandleGetCommand(cmd + 4);
     } else if (strncmp(cmd, "tail", 4) == 0) {
         HandleTailCommand(cmd + 4);
+    } else if (strncmp(cmd, "loglevel ", 9) == 0) {
+        HandleLogLevelCommand(cmd + 9);
     } else {
         HandleHelpCommand();
     }

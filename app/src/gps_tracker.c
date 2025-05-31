@@ -5,6 +5,7 @@
 #include <api_info.h>
 #include <api_event.h>
 #include <api_network.h>
+#include <api_fs.h>
 #include <api_lbs.h>
 #include <api_hal_uart.h>
 #include <api_hal_pm.h>
@@ -123,6 +124,48 @@ void processNetworkCellInfo(Network_Location_t* loc, int number)
     if (number<=0) return;
     snprintf(g_cellInfo,  sizeof(g_cellInfo), "%u%u%u,%u%u%u,%u,%u,%d",
              loc->sMcc[0], loc->sMcc[1], loc->sMcc[2], loc->sMnc[0], loc->sMnc[1], loc->sMnc[2], loc->sLac, loc->sCellID, loc->iRxLev);
+}
+
+static void format_size(char* buf, size_t bufsize, int value, const char* label) {
+    if (value >= 1024*1024*1024) {
+        float gb = value / (1024.0f * 1024.0f * 1024.0f);
+        snprintf(buf, bufsize, "%s%.3f GB", label, gb);
+    } else if (value >= 1024*1024) {
+        float mb = value / (1024.0f * 1024.0f);
+        snprintf(buf, bufsize, "%s%.1f MB", label, mb);
+    } else if (value >= 1024) {
+        float kb = value / 1024.0f;
+        snprintf(buf, bufsize, "%s%.1f KB", label, kb);
+    } else {
+        snprintf(buf, bufsize, "%s%d Bytes", label, value);
+    }
+}
+
+void FsInfoTest()
+{
+    API_FS_INFO fsInfo;
+    int sizeUsed = 0, sizeTotal = 0;
+    char used_buf[32], total_buf[32];
+
+    if(API_FS_GetFSInfo(FS_DEVICE_NAME_FLASH, &fsInfo) < 0)
+    {
+        LOGE("Get Int Flash device info fail!");
+    }
+    sizeUsed  = fsInfo.usedSize;
+    sizeTotal = fsInfo.totalSize;
+    format_size(used_buf, sizeof(used_buf), sizeUsed, "");
+    format_size(total_buf, sizeof(total_buf), sizeTotal, "");
+    LOGI("Int Flash used: %s, total size: %s", used_buf, total_buf);
+
+    if(API_FS_GetFSInfo(FS_DEVICE_NAME_T_FLASH, &fsInfo) < 0)
+    {
+        LOGE("Get Ext Flash device info fail!");
+    }
+    sizeUsed  = fsInfo.usedSize;
+    sizeTotal = fsInfo.totalSize;
+    format_size(used_buf, sizeof(used_buf), sizeUsed, "");
+    format_size(total_buf, sizeof(total_buf), sizeTotal, "");
+    LOGI("Ext Flash used: %s, total size: %s", used_buf, total_buf);
 }
 
 void EventHanler(API_Event_t* pEvent)
