@@ -3,6 +3,7 @@
 
 #include <api_fs.h>
 #include <api_info.h>
+#include <api_hal_pm.h>
 
 #include "debug.h"
 #include "config.h"
@@ -19,6 +20,7 @@ void HandleSetCommand(char*);
 void HandleGetCommand(char*);
 void HandleTailCommand(char*);
 void HandleLogLevelCommand(char*);
+void HandleRestartCommand(char*);
 
 struct uart_cmd_entry {
     const char* cmd;
@@ -37,6 +39,7 @@ static struct uart_cmd_entry uart_cmd_table[] = {
     {"get",      3, HandleGetCommand,        "get <param>",         "Print a value of a specified parameter"},
     {"tail",     4, HandleTailCommand,       "tail <file> [bytes]", "Print last [bytes] of file (default: 500)"},
     {"loglevel", 8, HandleLogLevelCommand,   "loglevel <level>",    "Set log level (error, warn, info, debug)"},
+    {"restart",  7, HandleRestartCommand,    "restart",             "Restart the system immediately"},
 };
 
 Config g_ConfigStore;
@@ -283,6 +286,12 @@ void HandleLogLevelCommand(char* param)
     Config_SetValue(&g_ConfigStore, KEY_LOG_LEVEL, param);
     Config_Save(&g_ConfigStore, CONFIG_FILE_PATH);
     UART_Printf("Log level set to %s\r\n", param);
+}
+
+void HandleRestartCommand(char* args)
+{
+    UART_Printf("System restarting...\r\n");
+    PM_Restart();
 }
 
 void HandleConfigCommand(char* args)
