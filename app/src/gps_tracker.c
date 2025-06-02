@@ -365,34 +365,25 @@ void gps_trackingTask(void *pData)
                 const char* serverName = Config_GetValue(&g_ConfigStore, KEY_TRACKING_SERVER_ADDR,     NULL, 0);
                 const char* serverPort = Config_GetValue(&g_ConfigStore, KEY_TRACKING_SERVER_PORT,     NULL, 0);
                 const char* protocol   = Config_GetValue(&g_ConfigStore, KEY_TRACKING_SERVER_PROTOCOL, NULL, 0);
-                if (strcmp(protocol, "https") == 0)
-                {
-                    if (Https_Post(&SSLconfig, serverName, serverPort, "/", requestBuffer, strlen(requestBuffer), responseBuffer, sizeof(responseBuffer)) < 0)
-                        LOGE("FAILED to send the location to the server via HTTPS");
-                    else
-                        LOGI("sent location to %s via HTTPS", serverName);
-                }
-                else if (strcmp(protocol, "http") == 0)
-                {
-                    int error;
-                    if (error = Http_Post(serverName, atoi(serverPort), "/", requestBuffer, strlen(requestBuffer), responseBuffer, sizeof(responseBuffer)) < 0)
-                        LOGE("FAILED to send the location to the server via HTTP. error %d", error);
-                    else
-                        LOGI("sent location to %s via HTTP", serverName);
-                }
-                else
-                {
+                SSL_Config_t *SSLparam = NULL;
+                if (strcmp(protocol, "https") == 0) SSLparam = &SSLconfig;
+                else if (strcmp(protocol, "http") != 0) {
                     LOGE("unknown protocol: %s", protocol);
+                    continue;
                 }
+                if (Http_Post(SSLparam, serverName, serverPort, "/", requestBuffer, strlen(requestBuffer), responseBuffer, sizeof(responseBuffer)) < 0)
+                    LOGE("FAILED to send the location to the server");
+                else
+                    LOGI("Sent location to %s", serverName);
             }
             else
             {
-                LOGE("no internet");
+                LOGE("No internet");
             }
         }
         else
         {
-            LOGE("no GPS fix");
+            LOGE("No GPS fix");
         }
 
         uint32_t loop_end = time(NULL);
