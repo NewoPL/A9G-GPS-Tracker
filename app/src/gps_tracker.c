@@ -54,7 +54,7 @@ bool AttachActivate()
     bool ret = Network_GetAttachStatus(&status);
     if(!ret)
     {
-        LOGE("ERROR - get attach status");
+        LOGE("get attach status failed");
         return false;
     }
     if(!status)
@@ -63,7 +63,7 @@ bool AttachActivate()
         LOGI("attaching to the network");
         if(!ret)
         {
-            LOGE("ERROR - network attach failed");
+            LOGE("network attach failed");
             return false;
         }
     }
@@ -72,7 +72,7 @@ bool AttachActivate()
         ret = Network_GetActiveStatus(&status);
         if(!ret)
         {
-            LOGE("ERROR - get activate status failed");
+            LOGE("get activate status failed");
             return false;
         }
         if(!status)
@@ -83,7 +83,7 @@ bool AttachActivate()
             Config_GetValue(&g_ConfigStore, KEY_APN_PASS, NetContext.userPasswd, sizeof(NetContext.userPasswd));
             ret = Network_StartActive(NetContext);
             if(!ret) {
-               LOGE("ERROR - network activate failed fail");
+               LOGE("network activate failed failed");
                return false;
             }
         }
@@ -257,50 +257,53 @@ uint8_t responseBuffer[1024];
 void gps_trackingTask(void *pData)
 {
     // wait for initialization
-    // The process of GPRS registration network may cause the power supply voltage of GPS to drop, which resulting in GPS restart.
     LOGI("Initialization.");
     LED_cycle_start(gpsTaskHandle);
     FsInfoTest();
-    while (!IS_INITIALIZED() ||!IS_GSM_STATUS_ON()) OS_Sleep(2000);
+    while (!IS_INITIALIZED() || !IS_GSM_STATUS_ON()) OS_Sleep(2000);
 
     GPS_Info_t* gpsInfo = Gps_GetInfo();
     GPS_SaveLog(false, GPS_NMEA_LOG_FILE_PATH);
+
     // open GPS hardware(UART2 open either)
     GPS_Open(NULL);
     LOGI("Waiting for GPS.");
     while(!IS_GPS_STATUS_ON()) OS_Sleep(2000);
 
     if(!GPS_GetVersion(responseBuffer, 255))
-        LOGE("ERROR - get GPS firmware version fail.");
+        LOGE("get GPS firmware version failed.");
     else
         LOGW("GPS firmware version: %s", responseBuffer);
 
-//    if(!GPS_SetSearchMode(true, true, false, true))
-        //UART_Printf("ERROR - set search mode fail.");
+    // if(!GPS_SetSearchMode(true, true, false, true))
+    //     LOGE("set search mode fail.");
 
+    //GPS_SetLpMode(GPS_LP_Mode_t mode);
+
+    LOGI("setting GPS fix mode to MODE_NORMAL.");
     if(!GPS_SetFixMode(GPS_FIX_MODE_NORMAL))
-        LOGE("ERROR - set fix mode fail.");
+        LOGE("set fix mode fail.");
 
     // if(!GPS_ClearLog())
-    //     UART_Printf("open file error, please check tf card");
+    //    LOGE("open file failed, please check tf card");
 
     // if(!GPS_ClearInfoInFlash())
-    //     UART_Printf("erase gps fail");
+    //     LOGE("erase gps fail");
     
     // if(!GPS_SetQzssOutput(false))
-    //     UART_Printf("enable qzss nmea output fail.");
+    //     LOGE("enable qzss nmea output fail.");
 
 
-    // if(!GPS_SetSBASEnable(true))
-    //     UART_Printf("enable sbas fail.");
+    //if(!GPS_SetSBASEnable(true))
+    //     LOGE("enable sbas fail.");
     
     LOGI("setting GPS LP Mode to GPS_LP_MODE_NORMAL.");
     if(!GPS_SetLpMode(GPS_LP_MODE_SUPPER_LP))
-        LOGE("ERROR - set GPS LP mode failed.");
+        LOGE("set GPS LP mode failed.");
 
     LOGI("setting GPS interval to 1000 ms");
     if(!GPS_SetOutputInterval(1000))
-        LOGE("ERROR - set GPS interval failed.");
+        LOGE("set GPS interval failed.");
     
     const char *device_name = Config_GetValue(&g_ConfigStore, KEY_DEVICE_NAME, NULL, 0);
     LOGI("Device name: %s", device_name);
@@ -312,7 +315,7 @@ void gps_trackingTask(void *pData)
         {
             if(!Network_GetCellInfoRequst()) {
                 g_cellInfo[0] = '\0';
-                LOGE("ERROR - network get cell info fail");
+                LOGE("network get cell info fail");
             }
 
             struct timespec timestamp;

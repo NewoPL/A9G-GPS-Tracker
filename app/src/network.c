@@ -41,7 +41,6 @@ static inline int http_send_receive(const char *hostName,
         return -1;
     }
     LOGD("Resolved IP for %s -> %s", hostName, IPAddr);
-    
 
     int fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if(fd < 0) {
