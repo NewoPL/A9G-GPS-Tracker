@@ -316,7 +316,11 @@ void gps_trackingTask(void *pData)
             }
 
             struct timespec timestamp;
-            minmea_gettime(&timestamp, &gpsInfo->rmc.date, &gpsInfo->rmc.time);
+            // Print RMC date and time fields before conversion
+            UART_Printf("RMC date: year=%d, month=%d, day=%d\r\n", gpsInfo->rmc.date.year, gpsInfo->rmc.date.month, gpsInfo->rmc.date.day);
+            UART_Printf("RMC time: hours=%d, minutes=%d, seconds=%d, microseconds=%d\r\n", gpsInfo->rmc.time.hours, gpsInfo->rmc.time.minutes, gpsInfo->rmc.time.seconds, gpsInfo->rmc.time.microseconds);
+            int minmea_result = minmea_gettime(&timestamp, &gpsInfo->rmc.date, &gpsInfo->rmc.time);
+            UART_Printf("minmea_gettime result: %d, timestamp.tv_sec: %ld, timestamp.tv_nsec: %ld\r\n", minmea_result, (long)timestamp.tv_sec, (long)timestamp.tv_nsec);
 
             // convert unit ddmm.mmmm to a floating point DD.DDD vale in degree(°) 
             float latitude  = minmea_tocoord(&gpsInfo->rmc.latitude);

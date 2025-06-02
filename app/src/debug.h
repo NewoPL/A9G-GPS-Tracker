@@ -28,6 +28,7 @@ extern int32_t      g_log_file;
 void     set_log_level(LogLevel level);
 char*    log_level_to_string(LogLevel level);
 LogLevel log_level_to_int(const char* str);
+char*    log_output_to_string(LoggerOutput output);
 void     UART_Printf(const char* fmt, ...) ;
 
 void log_message_internal(LogLevel level, const char *func, const char *format, ...);
@@ -41,5 +42,5 @@ void log_message_internal(LogLevel level, const char *func, const char *format, 
     log_message_internal(LOG_LEVEL_INFO,  __func__, format, ##__VA_ARGS__)
 #define LOGD(format, ...) \
     log_message_internal(LOG_LEVEL_DEBUG, __func__, format, ##__VA_ARGS__)
-
+    
 #endif // DEBUG

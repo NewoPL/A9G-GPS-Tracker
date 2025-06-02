@@ -24,6 +24,16 @@ char* log_level_to_string(LogLevel level)
     }
 }
 
+char* log_output_to_string(LoggerOutput output)
+{
+    switch (output) {
+        case LOGGER_OUTPUT_UART:  return "UART";
+        case LOGGER_OUTPUT_TRACE: return "TRACE";
+        case LOGGER_OUTPUT_FILE:  return "FILE";
+        default:                  return "UNKNOWN";
+    }
+}
+
 LogLevel log_level_to_int(const char* str)
 {
     char buf[16];

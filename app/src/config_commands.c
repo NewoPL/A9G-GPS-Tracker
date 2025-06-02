@@ -34,17 +34,17 @@ struct uart_cmd_entry {
 };
 
 static struct uart_cmd_entry uart_cmd_table[] = {
-    {"help",     4, HandleHelpCommand,       "help",                "Show this help message"},
-    {"config",   6, HandleConfigCommand,     "config",              "Print all configuration"},
-    {"ls",       2, HandleLsCommand,         "ls [path]",           "List files in specified folder (default: /)"},
-    {"rm",       2, HandleRemoveFileCommand, "rm <file>",           "Remove file at specified path"},
-    {"set",      3, HandleSetCommand,        "set <param> [value]", "Set value to a specified parameter. if no value provided parameter will be cleared."},
-    {"get",      3, HandleGetCommand,        "get <param>",         "Print a value of a specified parameter"},
-    {"tail",     4, HandleTailCommand,       "tail <file> [bytes]", "Print last [bytes] of file (default: 500)"},
-    {"loglevel", 8, HandleLogLevelCommand,   "loglevel [level]",    "Set or print log level (error, warn, info, debug)"},
-    {"gpslog",   6, HandleGpsLogCommand,     "gpslog <enable/diasable>", "enable/disable gps output to file"},
-    {"restart",  7, HandleRestartCommand,    "restart",             "Restart the system immediately"},
-    {"netactivate", 11, HandleNetworkActivateCommand, "netactivate", "Activate (attach and activate) the network"},
+    {"help",     4, HandleHelpCommand,       "help",                    "Show this help message"},
+    {"config",   6, HandleConfigCommand,     "config",                  "Print all configuration"},
+    {"ls",       2, HandleLsCommand,         "ls [path]",               "List files in specified folder (default: /)"},
+    {"rm",       2, HandleRemoveFileCommand, "rm <file>",               "Remove file at specified path"},
+    {"set",      3, HandleSetCommand,        "set <param> [value]",     "Set value to a specified parameter. if no value provided parameter will be cleared."},
+    {"get",      3, HandleGetCommand,        "get <param>",             "Print a value of a specified parameter"},
+    {"tail",     4, HandleTailCommand,       "tail <file> [bytes]",     "Print last [bytes] of file (default: 500)"},
+    {"loglevel", 8, HandleLogLevelCommand,   "loglevel [level]",        "Set or print log level (error, warn, info, debug)"},
+    {"gpslog",   6, HandleGpsLogCommand,     "gpslog <enable/disable>", "enable/disable gps output to file"},
+    {"restart",  7, HandleRestartCommand,    "restart",                 "Restart the system immediately"},
+    {"netactivate", 11, HandleNetworkActivateCommand, "netactivate",    "Activate (attach and activate) the network"},
 };
 
 static const char* get_config_key_by_param(const char* param)
@@ -94,17 +94,16 @@ void HandleSetCommand(char* param)
         return;
     }
 
-    if (Config_SetValue(&g_ConfigStore, (char*)key, value))
-    {
-        LOGI("Set %s to '%s'", field, value);
-        if (!Config_Save(&g_ConfigStore, CONFIG_FILE_PATH))
-            LOGE("Failed to save config file");    
-    }
-    else
+    if (!Config_SetValue(&g_ConfigStore, (char*)key, value))
     {
         LOGE("Failed to set %s", field);
+        return;
     }
-    
+
+    if (!Config_Save(&g_ConfigStore, CONFIG_FILE_PATH))
+        LOGE("Failed to save config file");
+
+    UART_Printf("Set %s to '%s'\r\n", field, value);
     return;
 }
 
@@ -123,12 +122,12 @@ void HandleGetCommand(char* param)
     }
 
     const char* value = Config_GetValue(&g_ConfigStore, key, NULL, 0);
-    if (value) {
-        UART_Printf("%s: %s\r\n", param, value);
-    } else {
-        UART_Printf("variable %s is not set.\r\n", param);
+    if (value==NULL) {
+        UART_Printf("internal error.\r\n");
+        return;
     }
-    
+
+    UART_Printf("%s: %s\r\n", param, value);
     return;
 }
 
@@ -163,7 +162,7 @@ void HandleLsCommand(char* path)
     {
         if (dirent->d_type == 8)
         {
-            int file_size = 0;
+            int32_t  file_size = 0;
             strncpy(file_path + base_path_len, dirent->d_name, sizeof(file_path) - base_path_len - 1);
             file_path[base_path_len + strlen(dirent->d_name)] = '\0';
             int32_t fd = API_FS_Open(file_path, FS_O_RDONLY, 0);

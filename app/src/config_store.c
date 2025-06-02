@@ -269,8 +269,8 @@ void ConfigStore_Init()
     Config_SetValue(&g_ConfigStore, KEY_TRACKING_SERVER_ADDR, DEFAULT_TRACKING_SERVER_ADDR);
     Config_SetValue(&g_ConfigStore, KEY_TRACKING_SERVER_PORT, DEFAULT_TRACKING_SERVER_PORT);
     Config_SetValue(&g_ConfigStore, KEY_TRACKING_SERVER_PROTOCOL, DEFAULT_TRACKING_SERVER_PROTOCOL);
-    Config_SetValue(&g_ConfigStore, KEY_LOG_LEVEL, log_level_to_string(LOG_LEVEL_INFO));
-    Config_SetValue(&g_ConfigStore, KEY_LOG_OUTPUT, "UART");
+    Config_SetValue(&g_ConfigStore, KEY_LOG_LEVEL, log_level_to_string(DEFAULT_LOG_LEVEL));
+    Config_SetValue(&g_ConfigStore, KEY_LOG_OUTPUT, log_output_to_string(DEFAULT_LOG_OUTPUT));
 
     if (!Config_Load(&g_ConfigStore, CONFIG_FILE_PATH))
     {
