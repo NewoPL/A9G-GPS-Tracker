@@ -15,6 +15,7 @@
 #define KEY_DEVICE_NAME                  "device name"
 #define KEY_LOG_OUTPUT                   "log output"
 #define KEY_LOG_LEVEL                    "log level"
+#define KEY_GPS_UERE                     "gps uere"
 
 typedef struct {
     char key[MAX_KEY_LENGTH];
@@ -94,6 +95,8 @@ bool Config_Save(Config* config, char* filename);
  * @return Pointer to the value string if found, or NULL if not found.
  */
 char* Config_GetValue(Config* config, const char* key, char* out_buffer, size_t buffer_len);
+
+float Config_GetValueFloat(Config* config, const char* key);
 
 /**
  * @brief Set value for a key in the config store (adds if not found).

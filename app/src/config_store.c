@@ -1,16 +1,15 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
 
 #include <api_os.h>
 #include <api_fs.h>
-#include <api_charset.h>
 #include <api_info.h>
 
-#include "debug.h"
+#include "gps_tracker.h"
 #include "config_commands.h"
 #include "config_store.h"
-#include "gps_tracker.h"
+#include "debug.h"
 
 Config g_ConfigStore;
 
@@ -198,6 +197,15 @@ char* Config_GetValue(Config* config, const char* key, char* out_buffer, size_t 
     return NULL;
 }
 
+float Config_GetValueFloat(Config* config, const char* key)
+{
+    char buf[32];
+    const char* val = Config_GetValue(config, key, buf, sizeof(buf));
+    if (!val || !*val)
+        return 0.0f;
+    return (float)atof(val);
+}
+
 bool Config_SetValue(Config* config, char* key, char* value) 
 {
     if (!config || !key || !value)
@@ -270,13 +278,14 @@ void ConfigStore_Init()
     Config_SetValue(&g_ConfigStore, KEY_TRACKING_SERVER_PORT, DEFAULT_TRACKING_SERVER_PORT);
     Config_SetValue(&g_ConfigStore, KEY_TRACKING_SERVER_PROTOCOL, DEFAULT_TRACKING_SERVER_PROTOCOL);
     Config_SetValue(&g_ConfigStore, KEY_LOG_LEVEL, log_level_to_string(DEFAULT_LOG_LEVEL));
-    Config_SetValue(&g_ConfigStore, KEY_LOG_OUTPUT, log_output_to_string(DEFAULT_LOG_OUTPUT));
+    Config_SetValue(&g_ConfigStore, KEY_GPS_UERE, DEFAULT_GPS_UERE);
 
     if (!Config_Load(&g_ConfigStore, CONFIG_FILE_PATH))
     {
         LOGE("load config file failed");
     }
 
+    // for the first run. when config.ini does not exist the device name should default to IMEI
     char *device_name = Config_GetValue(&g_ConfigStore, KEY_DEVICE_NAME, NULL, 0);
     if ((device_name == NULL) || (device_name[0] == '\0'))
     {
@@ -287,4 +296,9 @@ void ConfigStore_Init()
         else
             Config_SetValue(&g_ConfigStore, KEY_DEVICE_NAME, DEFAULT_DEVICE_NAME);    
     }
+ 
+    // after reboot LOG_OUTPUT always defaults to UART
+    Config_SetValue(&g_ConfigStore, KEY_LOG_OUTPUT, log_output_to_string(DEFAULT_LOG_OUTPUT));
+    // after reboot LOG_LEVEL is initialised from Config Store   
+    g_log_level = log_level_to_int(Config_GetValue(&g_ConfigStore, KEY_LOG_LEVEL, NULL, 0));
 }

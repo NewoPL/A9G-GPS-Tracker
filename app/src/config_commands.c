@@ -24,6 +24,7 @@ void HandleLogLevelCommand(char*);
 void HandleGpsLogCommand(char*);
 void HandleRestartCommand(char*);
 void HandleNetworkActivateCommand(char*);
+void HandleSetUERECommand(char*);
 
 struct uart_cmd_entry {
     const char* cmd;
@@ -45,6 +46,7 @@ static struct uart_cmd_entry uart_cmd_table[] = {
     {"gpslog",   6, HandleGpsLogCommand,     "gpslog <enable/disable>", "enable/disable gps output to file"},
     {"restart",  7, HandleRestartCommand,    "restart",                 "Restart the system immediately"},
     {"netactivate", 11, HandleNetworkActivateCommand, "netactivate",    "Activate (attach and activate) the network"},
+    {"set_UERE", 13, HandleSetUERECommand, "set_UERE <value>", "Set GPS UERE parameter (float >0 and <100)"},
 };
 
 static const char* get_config_key_by_param(const char* param)
@@ -59,6 +61,7 @@ static const char* get_config_key_by_param(const char* param)
         {"log_level",   KEY_LOG_LEVEL},
         {"log_output",  KEY_LOG_OUTPUT},
         {"device_name", KEY_DEVICE_NAME},
+        {"gps_uere",    KEY_GPS_UERE},
     };
     for (unsigned i = 0; i < sizeof(param_map)/sizeof(param_map[0]); ++i) {
         if (strcmp(param, param_map[i].param) == 0) {
@@ -292,6 +295,26 @@ void HandleNetworkActivateCommand(char* param)
     } else {
         UART_Printf("Network activation failed.\r\n");
     }
+}
+
+void HandleSetUERECommand(char* param) {
+    param = trim_whitespace(param);
+    if (!*param) {
+        UART_Printf("missing value\r\n");
+        return;
+    }
+    float val = atof(param);
+    if (val <= 0.0f || val > 100.0f) {
+        UART_Printf("invalid value (must be >0 and <100)\r\n");
+        return;
+    }
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%g", val);
+    if (!Config_SetValue(&g_ConfigStore, (char*)KEY_GPS_UERE, buf)) {
+        UART_Printf("failed to set gps_uere\r\n");
+        return;
+    }
+    UART_Printf("gps_uere set to %s\r\n", buf);
 }
 
 void HandleConfigCommand(char* args)

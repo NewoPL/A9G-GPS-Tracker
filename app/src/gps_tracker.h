@@ -11,5 +11,6 @@
 #define DEFAULT_TRACKING_SERVER_PORT     "443"
 #define DEFAULT_TRACKING_SERVER_PROTOCOL "https"
 #define DEFAULT_DEVICE_NAME              "gps"
+#define DEFAULT_GPS_UERE                 "5"
 
 #endif

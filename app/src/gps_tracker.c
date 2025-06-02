@@ -279,8 +279,6 @@ void gps_trackingTask(void *pData)
     // if(!GPS_SetSearchMode(true, true, false, true))
     //     LOGE("set search mode fail");
 
-    //GPS_SetLpMode(GPS_LP_Mode_t mode);
-
     // if(!GPS_ClearLog())
     //    LOGE("open file failed, please check tf card");
 
@@ -289,7 +287,6 @@ void gps_trackingTask(void *pData)
     
     // if(!GPS_SetQzssOutput(false))
     //     LOGE("enable qzss nmea output fail");
-
 
     //if(!GPS_SetSBASEnable(true))
     //     LOGE("enable sbas fail");
@@ -333,9 +330,8 @@ void gps_trackingTask(void *pData)
             float accuracy0 = minmea_tofloat(&gpsInfo->gsa[0].hdop);
             float accuracy1 = minmea_tofloat(&gpsInfo->gsa[1].hdop);
 
-            #define _GPS_UERE 5
-            
-            float accuracy  = _GPS_UERE * (accuracy0 < accuracy1 ? accuracy0 : accuracy1);
+            float gps_uere = Config_GetValueFloat(&g_ConfigStore, KEY_GPS_UERE);
+            float accuracy  = gps_uere * (accuracy0 < accuracy1 ? accuracy0 : accuracy1);
             
             uint8_t percent;
             PM_Voltage(&percent);
