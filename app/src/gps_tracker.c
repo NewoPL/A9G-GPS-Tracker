@@ -77,18 +77,6 @@ bool AttachActivate()
         }
         if(!status)
         {
-            /*
-            Network_PDP_Context_t NetContextDummy = {
-                .apn = "dummy",
-                .userName = "dummy",
-                .userPasswd = "dummy"
-            };
-            ret = Network_StartActive(NetContextDummy);
-            if(!ret) {
-               LOGE("ERROR - network activate failed fail");
-               return false;
-            }
-            */
             LOGI("activating the network");
             Config_GetValue(&g_ConfigStore, KEY_APN,      NetContext.apn,        sizeof(NetContext.apn));
             Config_GetValue(&g_ConfigStore, KEY_APN_USER, NetContext.userName,   sizeof(NetContext.userName));
@@ -320,7 +308,7 @@ void gps_trackingTask(void *pData)
     while(1)
     {
         uint32_t loop_start = time(NULL);
-        if(IS_GPS_STATUS_ON() && (gpsInfo->rmc.valid))
+        if(IS_GPS_STATUS_ON()) // && (gpsInfo->rmc.valid))
         {
             if(!Network_GetCellInfoRequst()) {
                 g_cellInfo[0] = '\0';
@@ -350,7 +338,7 @@ void gps_trackingTask(void *pData)
                                                             "speed= %.1f, "
                                                             "course= %.1f, " 
                                                             "battery= %d\r\n",
-                                                            time(NULL), timestamp.tv_sec, gpsInfo->gsa[0].fix_type, gpsInfo->gsa[1].fix_type,
+                                                            time(NULL), gpsInfo->rmc.date.year, gpsInfo->gsa[0].fix_type, gpsInfo->gsa[1].fix_type,
                                                             gpsInfo->gga.fix_quality, gpsInfo->gga.satellites_tracked, gpsInfo->gsv[0].total_sats, 
                                                             gpsInfo->rmc.valid, latitude, longitude, altitude, accuracy, speed, bearing, percent);
             responseBuffer[sizeof(responseBuffer) - 1] = '\0';
@@ -382,8 +370,9 @@ void gps_trackingTask(void *pData)
                 }
                 else if (strcmp(protocol, "http") == 0)
                 {
-                    if (Http_Post(serverName, atoi(serverPort), "/", requestBuffer, strlen(requestBuffer), responseBuffer, sizeof(responseBuffer)) < 0)
-                        LOGE("FAILED to send the location to the server via HTTP");
+                    int error;
+                    if (error = Http_Post(serverName, atoi(serverPort), "/", requestBuffer, strlen(requestBuffer), responseBuffer, sizeof(responseBuffer)) < 0)
+                        LOGE("FAILED to send the location to the server via HTTP. error %d", error);
                     else
                         LOGI("sent location to %s via HTTP", serverName);
                 }

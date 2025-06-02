@@ -127,7 +127,7 @@ err_ssl_close:
 err_ssl_destroy:
     // Destroy the SSL context
     if (SSL_Destroy(sslConfig) != SSL_ERROR_NONE) {
-        LOGE("SSL destroy error: %d", error);
+        LOGD("SSL destroy error: %d", error);
     } 
 
 err_free_buf:

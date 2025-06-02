@@ -21,6 +21,7 @@ void HandleSetCommand(char*);
 void HandleGetCommand(char*);
 void HandleTailCommand(char*);
 void HandleLogLevelCommand(char*);
+void HandleGpsLogCommand(char*);
 void HandleRestartCommand(char*);
 void HandleNetworkActivateCommand(char*);
 
@@ -41,6 +42,7 @@ static struct uart_cmd_entry uart_cmd_table[] = {
     {"get",      3, HandleGetCommand,        "get <param>",         "Print a value of a specified parameter"},
     {"tail",     4, HandleTailCommand,       "tail <file> [bytes]", "Print last [bytes] of file (default: 500)"},
     {"loglevel", 8, HandleLogLevelCommand,   "loglevel [level]",    "Set or print log level (error, warn, info, debug)"},
+    {"gpslog",   6, HandleGpsLogCommand,     "gpslog <enable/diasable>", "enable/disable gps output to file"},
     {"restart",  7, HandleRestartCommand,    "restart",             "Restart the system immediately"},
     {"netactivate", 11, HandleNetworkActivateCommand, "netactivate", "Activate (attach and activate) the network"},
 };
