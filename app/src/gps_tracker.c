@@ -10,12 +10,12 @@
 #include <api_hal_uart.h>
 #include <api_hal_pm.h>
 
-#include "buffer.h"
-#include "gps_parse.h"
 #include "math.h"
-#include "gps.h"
 #include "time.h"
 #include "assert.h"
+#include "buffer.h"
+#include "gps.h"
+#include "gps_parse.h"
 
 #include "system.h"
 #include "gps_tracker.h"
@@ -23,6 +23,7 @@
 #include "config_commands.h"
 #include "config_store.h"
 #include "led_handler.h"
+#include "utils.h"
 #include "debug.h"
 
 #define MAIN_TASK_STACK_SIZE    (2048 * 2)
@@ -257,32 +258,28 @@ uint8_t responseBuffer[1024];
 void gps_trackingTask(void *pData)
 {
     // wait for initialization
-    LOGI("Initialization.");
+    LOGI("Initialization");
     LED_cycle_start(gpsTaskHandle);
     FsInfoTest();
     while (!IS_INITIALIZED() || !IS_GSM_STATUS_ON()) OS_Sleep(2000);
 
     GPS_Info_t* gpsInfo = Gps_GetInfo();
     GPS_SaveLog(false, GPS_NMEA_LOG_FILE_PATH);
-
+ 
     // open GPS hardware(UART2 open either)
     GPS_Open(NULL);
-    LOGI("Waiting for GPS.");
+    LOGI("Waiting for GPS");
     while(!IS_GPS_STATUS_ON()) OS_Sleep(2000);
 
     if(!GPS_GetVersion(responseBuffer, 255))
-        LOGE("get GPS firmware version failed.");
+        LOGE("get GPS firmware version failed");
     else
         LOGW("GPS firmware version: %s", responseBuffer);
 
     // if(!GPS_SetSearchMode(true, true, false, true))
-    //     LOGE("set search mode fail.");
+    //     LOGE("set search mode fail");
 
     //GPS_SetLpMode(GPS_LP_Mode_t mode);
-
-    LOGI("setting GPS fix mode to MODE_NORMAL.");
-    if(!GPS_SetFixMode(GPS_FIX_MODE_NORMAL))
-        LOGE("set fix mode fail.");
 
     // if(!GPS_ClearLog())
     //    LOGE("open file failed, please check tf card");
@@ -291,19 +288,23 @@ void gps_trackingTask(void *pData)
     //     LOGE("erase gps fail");
     
     // if(!GPS_SetQzssOutput(false))
-    //     LOGE("enable qzss nmea output fail.");
+    //     LOGE("enable qzss nmea output fail");
 
 
     //if(!GPS_SetSBASEnable(true))
-    //     LOGE("enable sbas fail.");
-    
-    LOGI("setting GPS LP Mode to GPS_LP_MODE_NORMAL.");
+    //     LOGE("enable sbas fail");
+
+    LOGI("setting GPS fix mode to MODE_NORMAL");
+    if(!GPS_SetFixMode(GPS_FIX_MODE_NORMAL))
+        LOGE("set fix mode fail");
+
+    LOGI("setting GPS LP Mode to GPS_LP_MODE_NORMAL");
     if(!GPS_SetLpMode(GPS_LP_MODE_SUPPER_LP))
-        LOGE("set GPS LP mode failed.");
+        LOGE("set GPS LP mode failed");
 
     LOGI("setting GPS interval to 1000 ms");
     if(!GPS_SetOutputInterval(1000))
-        LOGE("set GPS interval failed.");
+        LOGE("set GPS interval failed");
     
     const char *device_name = Config_GetValue(&g_ConfigStore, KEY_DEVICE_NAME, NULL, 0);
     LOGI("Device name: %s", device_name);
@@ -311,29 +312,30 @@ void gps_trackingTask(void *pData)
     while(1)
     {
         uint32_t loop_start = time(NULL);
-        if(IS_GPS_STATUS_ON()) // && (gpsInfo->rmc.valid))
+        if(IS_GPS_STATUS_ON() && (gpsInfo->rmc.valid))
         {
             if(!Network_GetCellInfoRequst()) {
                 g_cellInfo[0] = '\0';
                 LOGE("network get cell info fail");
             }
 
-            struct timespec timestamp;
-            // Print RMC date and time fields before conversion
-            UART_Printf("RMC date: year=%d, month=%d, day=%d\r\n", gpsInfo->rmc.date.year, gpsInfo->rmc.date.month, gpsInfo->rmc.date.day);
-            UART_Printf("RMC time: hours=%d, minutes=%d, seconds=%d, microseconds=%d\r\n", gpsInfo->rmc.time.hours, gpsInfo->rmc.time.minutes, gpsInfo->rmc.time.seconds, gpsInfo->rmc.time.microseconds);
-            int minmea_result = minmea_gettime(&timestamp, &gpsInfo->rmc.date, &gpsInfo->rmc.time);
-            UART_Printf("minmea_gettime result: %d, timestamp.tv_sec: %ld, timestamp.tv_nsec: %ld\r\n", minmea_result, (long)timestamp.tv_sec, (long)timestamp.tv_nsec);
+            time_t gps_timestamp = mk_time(&gpsInfo->rmc.date, &gpsInfo->rmc.time);
 
-            // convert unit ddmm.mmmm to a floating point DD.DDD vale in degree(°) 
+            // convert coordinates ddmm.mmmm to a floating point DD.DDD vale in degree(°) 
             float latitude  = minmea_tocoord(&gpsInfo->rmc.latitude);
             float longitude = minmea_tocoord(&gpsInfo->rmc.longitude);
+            
+            // convert other data a floating point 
             float speed     = minmea_tofloat(&gpsInfo->rmc.speed);
             float bearing   = minmea_tofloat(&gpsInfo->rmc.course);
             float altitude  = minmea_tofloat(&gpsInfo->gga.altitude);
-            //float accuracy  = sqrt(pow(minmea_tofloat(&gpsInfo->gst.latitude_error_deviation), 2) +
-            //                       pow(minmea_tofloat(&gpsInfo->gst.longitude_error_deviation), 2));
-            float accuracy  = 10;
+            
+            float accuracy0 = minmea_tofloat(&gpsInfo->gsa[0].hdop);
+            float accuracy1 = minmea_tofloat(&gpsInfo->gsa[1].hdop);
+
+            #define _GPS_UERE 5
+            
+            float accuracy  = _GPS_UERE * (accuracy0 < accuracy1 ? accuracy0 : accuracy1);
             
             uint8_t percent;
             PM_Voltage(&percent);
@@ -345,7 +347,7 @@ void gps_trackingTask(void *pData)
                                                             "speed= %.1f, "
                                                             "course= %.1f, " 
                                                             "battery= %d\r\n",
-                                                            time(NULL), gpsInfo->rmc.date.year, gpsInfo->gsa[0].fix_type, gpsInfo->gsa[1].fix_type,
+                                                            time(NULL), gps_timestamp, gpsInfo->gsa[0].fix_type, gpsInfo->gsa[1].fix_type,
                                                             gpsInfo->gga.fix_quality, gpsInfo->gga.satellites_tracked, gpsInfo->gsv[0].total_sats, 
                                                             gpsInfo->rmc.valid, latitude, longitude, altitude, accuracy, speed, bearing, percent);
             responseBuffer[sizeof(responseBuffer) - 1] = '\0';
@@ -360,7 +362,7 @@ void gps_trackingTask(void *pData)
 
             snprintf(requestBuffer, sizeof(requestBuffer),
                      "id=%s&valid=%d&timestamp=%d&lat=%f&lon=%f&speed=%1.f&bearing=%.1f&altitude=%.1f&accuracy=%.1f%s&batt=%d",
-                     device_name, gpsInfo->rmc.valid, time(NULL), latitude, longitude, speed, bearing, altitude, accuracy, responseBuffer, percent);
+                     device_name, gpsInfo->rmc.valid, gps_timestamp, latitude, longitude, speed, bearing, altitude, accuracy, responseBuffer, percent);
             requestBuffer[sizeof(requestBuffer) - 1] = '\0';
 
             if(IS_GSM_STATUS_ON())
