@@ -26,8 +26,23 @@ hkjOPQQDAgNJADBGAiEAokJL0LgR6SOLR02WWxccAq3ndXp4EMRveXMUVUxMWSMC\n\
 IQDspFWa3fj7nLgouSdkcPy1SdOR2AGm9OQWs7veyXsBwA==\n\
 -----END CERTIFICATE-----";
 
-static int http_send_receive(const char *ip, const char *port, char *sendBuffer, int sendBufferLen, char *retBuffer, int retBufferSize)
+static inline int http_send_receive(const char *hostName,
+                                    const char *port,
+                                    char       *sendBuffer,
+                                    int         sendBufferLen,
+                                    char       *retBuffer,
+                                    int         retBufferSize)
 {
+    // Get IP from DNS server.
+    uint8_t IPAddr[16];
+    memset(IPAddr, 0, sizeof(IPAddr));
+    if(DNS_GetHostByName2(hostName, IPAddr) != 0) {
+        LOGE("Cannot resolve the hostName name");
+        return -1;
+    }
+    LOGD("Resolved IP for %s -> %s", hostName, IPAddr);
+    
+
     int fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if(fd < 0) {
         LOGE("socket fail");
@@ -38,7 +53,7 @@ static int http_send_receive(const char *ip, const char *port, char *sendBuffer,
     memset(&sockaddr, 0, sizeof(sockaddr));
     sockaddr.sin_family = AF_INET;
     sockaddr.sin_port = htons(atoi(port));
-    inet_pton(AF_INET, ip, &sockaddr.sin_addr);
+    inet_pton(AF_INET, IPAddr, &sockaddr.sin_addr);
 
     int ret = connect(fd, (struct sockaddr*)&sockaddr, sizeof(struct sockaddr_in));
     if(ret < 0){
@@ -95,13 +110,13 @@ static int http_send_receive(const char *ip, const char *port, char *sendBuffer,
 }
 
 
-static int https_send_receive(SSL_Config_t *sslConfig,
-                              const char   *hostName,
-                              const char   *port,
-                              char         *buffer,
-                              int           bufferLen,
-                              char         *retBuffer,
-                              int           retBufferSize)
+static inline int https_send_receive(SSL_Config_t *sslConfig,
+                                     const char   *hostName,
+                                     const char   *port,
+                                     char         *buffer,
+                                     int           bufferLen,
+                                     char         *retBuffer,
+                                     int           retBufferSize)
 {
     SSL_Error_t error;
     sslConfig->caCert = ca_cert;
@@ -110,7 +125,6 @@ static int https_send_receive(SSL_Config_t *sslConfig,
     error = SSL_Init(sslConfig);
     if(error != SSL_ERROR_NONE) {
         LOGD("SSL init error: %d", error);
-        OS_Free(buffer);
         return error;
     }
 
@@ -118,19 +132,14 @@ static int https_send_receive(SSL_Config_t *sslConfig,
     error = SSL_Connect(sslConfig, hostName, port);
     if(error != SSL_ERROR_NONE) {
         LOGD("SSL connect error: %d", error);
-        SSL_Destroy(sslConfig);
-        OS_Free(buffer);
-        return error;
+        goto err_ssl_destroy;
     }
 
     // Send package
     error = SSL_Write(sslConfig, buffer, bufferLen, SSL_WRITE_TIMEOUT);
     if(error <= 0) {
         LOGD("SSL Write error: %d", error);
-        SSL_Close(sslConfig);
-        SSL_Destroy(sslConfig);
-        OS_Free(buffer);
-        return error;
+        goto err_ssl_close;
     }
 
     // Read response
@@ -138,24 +147,20 @@ static int https_send_receive(SSL_Config_t *sslConfig,
     error = SSL_Read(sslConfig, retBuffer, retBufferSize, SSL_READ_TIMEOUT);
     if(error < 0) {
         LOGD("SSL Read error: %d", error);
-        SSL_Close(sslConfig);
-        SSL_Destroy(sslConfig);
-        OS_Free(buffer);
-        return error;
+        goto err_ssl_close;
     }
     if(error == 0) {
         LOGD("SSL no receive response");
         error = SSL_ERROR_INTERNAL;
-        SSL_Close(sslConfig);
-        SSL_Destroy(sslConfig);
-        OS_Free(buffer);
-        return error;
+        goto err_ssl_close;
     }
 
+err_ssl_close:
     if (SSL_Close(sslConfig) != SSL_ERROR_NONE) {
         LOGD("SSL close error: %d", error);
     }
 
+err_ssl_destroy:
     if (SSL_Destroy(sslConfig) != SSL_ERROR_NONE) {
         LOGD("SSL destroy error: %d", error);
     }
@@ -174,20 +179,11 @@ int Http_Post(SSL_Config_t *sslConfig,
               int           retBufferSize)
 {
     if (strlen(data) != dataLen) {
-        LOGE("dataLen mismatch with actual data length");
+        LOGE("DataLen mismatch with actual data length");
         return -1;
     }
 
-    // Get IP from DNS server.
-    uint8_t IPAddr[16];
-    memset(IPAddr, 0, sizeof(IPAddr));
-    if(DNS_GetHostByName2(hostName, IPAddr) != 0) {
-        LOGE("Cannot resolve the hostName name");
-        return -1;
-    }
-    LOGD("Resolved IP for %s -> %s", hostName, IPAddr);
-    
-    // Create the HTTP POST request package
+    // Create the HTTP POST request template
     const char* fmt = "POST %s HTTP/1.1\r\n"
                       "Host: %s\r\n"
                       "Content-Type: application/x-www-form-urlencoded\r\n"
@@ -208,7 +204,7 @@ int Http_Post(SSL_Config_t *sslConfig,
         return -1;
     }
      
-    // Build the package
+    // Build the complete HTTP POST request
     snprintf(buffer, bufferLen, fmt, path, hostName, dataLen, data);
     buffer[bufferLen] = 0;
 
@@ -222,7 +218,7 @@ int Http_Post(SSL_Config_t *sslConfig,
 
     if (sslConfig == NULL)
         // Use HTTP for non-secure connection
-        returnVal = http_send_receive(IPAddr,
+        returnVal = http_send_receive(hostName,
                                       port,
                                       buffer,
                                       bufferLen,
@@ -231,7 +227,7 @@ int Http_Post(SSL_Config_t *sslConfig,
     else
         // Use SSL for secure connection        
         returnVal = https_send_receive(sslConfig,
-                                       IPAddr,
+                                       hostName,
                                        port,
                                        buffer,
                                        bufferLen,
@@ -241,4 +237,3 @@ int Http_Post(SSL_Config_t *sslConfig,
     OS_Free(buffer);
     return returnVal;
 }
-
