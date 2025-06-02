@@ -278,7 +278,7 @@ void ConfigStore_Init()
     }
 
     char *device_name = Config_GetValue(&g_ConfigStore, KEY_DEVICE_NAME, NULL, 0);
-    if ((device_name == NULL) || (device_name[0]='\0'))
+    if ((device_name == NULL) || (device_name[0] == '\0'))
     {
         char IMEI[16];
         memset(IMEI, 0, sizeof(IMEI));
