@@ -138,7 +138,7 @@ bool Config_Save(Config* config, char* filename)
     if (!config || !filename)
         return false;
 
-    int32_t fd = API_FS_Open(filename, FS_O_RDWR | FS_O_CREAT, 0);
+    int32_t fd = API_FS_Open(filename, FS_O_RDWR | FS_O_CREAT | FS_O_TRUNC, 0);
     if ( fd < 0)
     {
         LOGE("Open file failed:%d",fd);
