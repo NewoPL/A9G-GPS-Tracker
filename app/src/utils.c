@@ -18,7 +18,7 @@ time_t mk_time(const struct minmea_date *date, const struct minmea_time *time_)
     int year = date->year;
     int month = date->month-1;
     int day = date->day-1;
-    if (year < 80) year += 100;
+    if (year < 70) year += 100;
 
     // Normalize month/year
     while (month < 0) { month += 12; year--; }
@@ -30,9 +30,7 @@ time_t mk_time(const struct minmea_date *date, const struct minmea_time *time_)
     // Years
     for (int y = 70; y < year; y++)
         days += is_leap_year(y) ? 366 : 365;
-    for (int y = year; y < 70; y--)
-        days -= is_leap_year(y - 1) ? 366 : 365;
-
+    
     // Months
     for (int m = 0; m < month; m++)
         days += days_in_month(m, year);

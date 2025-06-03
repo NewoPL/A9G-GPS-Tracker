@@ -84,7 +84,7 @@ bool AttachActivate()
             Config_GetValue(&g_ConfigStore, KEY_APN_PASS, NetContext.userPasswd, sizeof(NetContext.userPasswd));
             ret = Network_StartActive(NetContext);
             if(!ret) {
-               LOGE("network activate failed failed");
+               LOGE("network activate failed");
                return false;
             }
         }
@@ -155,7 +155,7 @@ void FsInfoTest()
     LOGI("Ext Flash used: %s, total size: %s", used_buf, total_buf);
 }
 
-void EventHanler(API_Event_t* pEvent)
+void EventHandler(API_Event_t* pEvent)
 {
     switch(pEvent->id)
     {
@@ -175,7 +175,6 @@ void EventHanler(API_Event_t* pEvent)
             GSM_STATUS_OFF();
             break;
         case API_EVENT_ID_NETWORK_REGISTER_NO:
-            GSM_STATUS_OFF();
             LOGE("network register no");
             break;
 
@@ -426,7 +425,7 @@ void gps_MainTask(void *pData)
 
         if(OS_WaitEvent(gpsTaskHandle, (void**)&event, OS_TIME_OUT_WAIT_FOREVER))
         {
-            EventHanler(event);
+            EventHandler(event);
             OS_Free(event->pParam1);
             OS_Free(event->pParam2);
             OS_Free(event);

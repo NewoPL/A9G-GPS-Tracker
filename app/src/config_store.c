@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include <api_os.h>
 #include <api_fs.h>
@@ -202,7 +203,7 @@ float Config_GetValueFloat(Config* config, const char* key)
     char buf[32];
     const char* val = Config_GetValue(config, key, buf, sizeof(buf));
     if (!val || !*val)
-        return 0.0f;
+        return NAN;
     return (float)atof(val);
 }
 
