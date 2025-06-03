@@ -46,7 +46,7 @@ static struct uart_cmd_entry uart_cmd_table[] = {
     {"gpslog",   6, HandleGpsLogCommand,     "gpslog <enable/disable>", "enable/disable gps output to file"},
     {"restart",  7, HandleRestartCommand,    "restart",                 "Restart the system immediately"},
     {"netactivate", 11, HandleNetworkActivateCommand, "netactivate",    "Activate (attach and activate) the network"},
-    {"set_UERE", 13, HandleSetUERECommand, "set_UERE <value>", "Set GPS UERE parameter (float >0 and <100)"},
+    {"set_uere", 8, HandleSetUERECommand, "set_UERE <value>", "Set GPS UERE parameter (float >0 and <100)"},
 };
 
 static const char* get_config_key_by_param(const char* param)
