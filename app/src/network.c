@@ -33,8 +33,13 @@ static inline int http_send_receive(const char *hostName,
                                     char       *retBuffer,
                                     int         retBufferSize)
 {
+    if (!hostName || !port || !sendBuffer || sendBufferLen <= 0 || !retBuffer || retBufferSize <= 0) {
+        LOGE("Invalid input parameters");
+        return -1;
+    }
+
     // Get IP from DNS server.
-    uint8_t IPAddr[16];
+    char IPAddr[INET_ADDRSTRLEN];
     memset(IPAddr, 0, sizeof(IPAddr));
     if(DNS_GetHostByName2(hostName, IPAddr) != 0) {
         LOGE("Cannot resolve the hostName name");
@@ -48,10 +53,17 @@ static inline int http_send_receive(const char *hostName,
         return -1;
     }
 
+    int port_num = strtol(port, NULL, 10);
+    if (port_num <= 0 || port_num > 65535) {
+        LOGE("Invalid port number");
+        close(fd);
+        return -1;
+    }
+
     struct sockaddr_in sockaddr;
     memset(&sockaddr, 0, sizeof(sockaddr));
     sockaddr.sin_family = AF_INET;
-    sockaddr.sin_port = htons(atoi(port));
+    sockaddr.sin_port = htons(port_num);
     inet_pton(AF_INET, IPAddr, &sockaddr.sin_addr);
 
     int ret = connect(fd, (struct sockaddr*)&sockaddr, sizeof(struct sockaddr_in));
@@ -60,21 +72,27 @@ static inline int http_send_receive(const char *hostName,
         close(fd);
         return -1;
     }
-    ret = send(fd, sendBuffer, sendBufferLen, 0);
-    if(ret < 0){
-        LOGE("socket send fail");
-        close(fd);
-        return -1;
+
+    int totalSent = 0;
+    while (totalSent < sendBufferLen) {
+        ret = send(fd, sendBuffer + totalSent, sendBufferLen - totalSent, 0);
+        if (ret <= 0) {
+            LOGE("socket send fail");
+            close(fd);
+            return -1;
+        }
+        totalSent += ret;
     }
 
     struct fd_set fds;
     struct timeval timeout = {12, 0};
-    FD_ZERO(&fds);
-    FD_SET(fd, &fds);
     uint16_t recvLen = 0;
 
     while (recvLen < retBufferSize)
     {
+        FD_ZERO(&fds);
+        FD_SET(fd, &fds);
+
         ret = select(fd+1, &fds, NULL, NULL, &timeout);
         if (ret == -1) {
             LOGE("HTTP response error");

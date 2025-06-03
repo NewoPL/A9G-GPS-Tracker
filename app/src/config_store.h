@@ -96,6 +96,17 @@ bool Config_Save(Config* config, char* filename);
  */
 char* Config_GetValue(Config* config, const char* key, char* out_buffer, size_t buffer_len);
 
+/**
+ * @brief Get a float value for a given key from the config store.
+ *
+ * This function searches the provided Config structure for the specified key.
+ * If found, it parses the value as a float and returns it. If the key is not found
+ * or the value is empty, it returns NAN (not-a-number).
+ *
+ * @param config Pointer to the Config structure to search.
+ * @param key The key to look up.
+ * @return The float value for the key, or NAN if not found or empty.
+ */
 float Config_GetValueFloat(Config* config, const char* key);
 
 /**
