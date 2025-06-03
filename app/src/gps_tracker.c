@@ -317,7 +317,7 @@ void gps_trackingTask(void *pData)
 
             time_t gps_timestamp = mk_time(&gpsInfo->rmc.date, &gpsInfo->rmc.time);
 
-            // convert coordinates ddmm.mmmm to a floating point DD.DDD vale in degree(°) 
+            // convert coordinates ddmm.mmmm to a floating point DD.DDD value in degree(°) 
             float latitude  = minmea_tocoord(&gpsInfo->rmc.latitude);
             float longitude = minmea_tocoord(&gpsInfo->rmc.longitude);
             
