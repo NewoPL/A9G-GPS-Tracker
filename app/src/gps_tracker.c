@@ -275,8 +275,7 @@ void gps_trackingTask(void *pData)
     else
         LOGW("GPS firmware version: %s", responseBuffer);
 
-    // if(!GPS_SetSearchMode(true, true, false, true))
-    //     LOGE("set search mode fail");
+    GPS_SetSearchMode(true, false, false, true);
 
     // if(!GPS_ClearLog())
     //    LOGE("open file failed, please check tf card");
@@ -295,7 +294,7 @@ void gps_trackingTask(void *pData)
         LOGE("set fix mode fail");
 
     LOGI("setting GPS LP Mode to GPS_LP_MODE_NORMAL");
-    if(!GPS_SetLpMode(GPS_LP_MODE_SUPPER_LP))
+    if(!GPS_SetLpMode(GPS_LP_MODE_NORMAL))
         LOGE("set GPS LP mode failed");
 
     LOGI("setting GPS interval to 1000 ms");
@@ -327,24 +326,22 @@ void gps_trackingTask(void *pData)
             float altitude  = minmea_tofloat(&gpsInfo->gga.altitude);
             
             float accuracy0 = minmea_tofloat(&gpsInfo->gsa[0].hdop);
-            float accuracy1 = minmea_tofloat(&gpsInfo->gsa[1].hdop);
 
             float gps_uere = Config_GetValueFloat(&g_ConfigStore, KEY_GPS_UERE);
-            float accuracy  = gps_uere * (accuracy0 < accuracy1 ? accuracy0 : accuracy1);
-            
+            float accuracy  = gps_uere * accuracy0;
+
             uint8_t percent;
             PM_Voltage(&percent);
 
-            snprintf(responseBuffer, sizeof(responseBuffer),"time=%d, timestamp:%d, GPS fix mode:%d, BDS fix mode:%d, "
-                                                            "fix quality:%d, satellites tracked:%d, gps sates total:%d, "
-                                                            "valid: %d, Latitude:%f, Longitude:%f, altitude:%f, "
-                                                            "accuaracy = %.1f, "
-                                                            "speed= %.1f, "
-                                                            "course= %.1f, " 
-                                                            "battery= %d\r\n",
-                                                            time(NULL), gps_timestamp, gpsInfo->gsa[0].fix_type, gpsInfo->gsa[1].fix_type,
-                                                            gpsInfo->gga.fix_quality, gpsInfo->gga.satellites_tracked, gpsInfo->gsv[0].total_sats, 
-                                                            gpsInfo->rmc.valid, latitude, longitude, altitude, accuracy, speed, bearing, percent);
+            snprintf(responseBuffer, sizeof(responseBuffer),"%02d.%02d.%02d %02d:%02d.%02d, "
+                                                            "sat visible:%d, sat tracked:%d, "
+                                                            "Lat:%f, Lon:%f, alt:%f, "
+                                                            "error = %.1f, "
+                                                            "spd= %.1f, hdg= %.1f, bat= %d\r\n",
+                                                            gpsInfo->rmc.date.year,gpsInfo->rmc.date.month, gpsInfo->rmc.date.day,
+                                                            gpsInfo->rmc.time.hours,gpsInfo->rmc.time.minutes,gpsInfo->rmc.time.seconds,
+                                                            gpsInfo->gsv[0].total_sats, gpsInfo->gga.satellites_tracked,
+                                                            latitude, longitude, altitude, accuracy, speed, bearing, percent);
             responseBuffer[sizeof(responseBuffer) - 1] = '\0';
 
             //send to UART1
@@ -371,6 +368,7 @@ void gps_trackingTask(void *pData)
                     LOGE("unknown protocol: %s", protocol);
                     continue;
                 }
+
                 if (Http_Post(SSLparam, serverName, serverPort, "/", requestBuffer, strlen(requestBuffer), responseBuffer, sizeof(responseBuffer)) < 0)
                     LOGE("FAILED to send the location to the server");
                 else
@@ -390,8 +388,8 @@ void gps_trackingTask(void *pData)
         uint32_t loop_duration = (loop_end - loop_start);
         uint32_t desired_interval = 10; // target loop period in ms (e.g., 10 seconds)
 
-        if (loop_duration < desired_interval) 
-            OS_Sleep((desired_interval - loop_duration)*1000);
+        if (loop_duration > desired_interval) loop_duration = desired_interval;
+        OS_Sleep((desired_interval - loop_duration)*1000);
     }
 }
 
