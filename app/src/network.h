@@ -5,28 +5,7 @@
 #define SSL_READ_TIMEOUT  2000
 
 /**
- * @brief Sends an HTTP POST request to the specified server.
- * 
- * @param domain The domain name or IP address of the server (e.g., "example.com").
- * @param port The port number to connect to (e.g., 80 for HTTP).
- * @param path The path of the resource on the server (e.g., "/api/data").
- * @param body The data to be sent in the POST request body.
- * @param bodyLen The length of the data to be sent.
- * @param retBuffer A buffer to store the response data received from the server.
- * @param bufferLen The size of the buffer allocated for the response data.
- * @return int Returns the length of the response on success, or -1 on failure.
- */
-int Http_Post(const char  *domain, 
-              int          port,
-              const char  *path,
-              uint8_t     *body,
-              uint16_t     bodyLen,
-              char        *retBuffer,
-              int          bufferLen);
-
-
-/**
- * @brief Sends an HTTPS POST request to the specified server.
+ * @brief Sends an HTTP/HTTPs POST request to the specified server.
  * 
  * @param hostName The hostName name of the server (e.g., "example.com").
  * @param port The port number to connect to (e.g., 443 for HTTPS).
@@ -37,13 +16,13 @@ int Http_Post(const char  *domain,
  * @param retBufferSize The size of the buffer allocated for the response data.
  * @return int Returns the length of the response on success, or -1 on failure.
  */
-int Https_Post(SSL_Config_t *sslConfig,
-               const char   *hostName,
-               const char   *port,
-               const char   *path,
-               const char   *data,
-               uint16_t      dataLen,
-               char*         retBuffer,
-               int           retBufferSize);
+int Http_Post(SSL_Config_t *sslConfig,
+              const char   *hostName,
+              const char   *port,
+              const char   *path,
+              const char   *data,
+              uint16_t      dataLen,
+              char*         retBuffer,
+              int           retBufferSize);
 
 #endif

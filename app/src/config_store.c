@@ -1,15 +1,20 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
-#include "api_os.h"
-#include "api_fs.h"
-#include "api_charset.h"
-#include "api_debug.h"
+#include <math.h>
 
-#include "config.h"
-#include "config_parser.h"
+#include <api_os.h>
+#include <api_fs.h>
+#include <api_info.h>
 
-static char* trim_whitespace(char* str)
+#include "gps_tracker.h"
+#include "config_commands.h"
+#include "config_store.h"
+#include "debug.h"
+
+Config g_ConfigStore;
+
+char* trim_whitespace(char* str)
 {
     if (!str) return NULL;
 
@@ -55,10 +60,10 @@ bool Config_Load(Config* config, char* filename)
     if (!config || !filename)
         return false;
 
-    int32_t fd = API_FS_Open(filename, FS_O_RDWR, 0);
+    int32_t fd = API_FS_Open(filename, FS_O_RDWR | FS_O_CREAT, 0);
     if (fd < 0)
     {
-        Trace(1, "Open file failed: %d", fd);
+        LOGE("Open file failed: %d", fd);
         return false;
     }
 
@@ -71,7 +76,7 @@ bool Config_Load(Config* config, char* filename)
         int32_t read_bytes = API_FS_Read(fd, buffer + leftover, sizeof(buffer) - leftover - 1);
         if (read_bytes < 0)
         {
-            Trace(1, "Read error: %d", read_bytes);
+            LOGE("Read error: %d", read_bytes);
             API_FS_Close(fd);
             return false;
         }
@@ -97,7 +102,7 @@ bool Config_Load(Config* config, char* filename)
             {
                 if (skip_next_line)
                 {
-                    Trace(2, "Skipping long line exceeding buffer size");                    
+                    LOGD("Skipping long line exceeding buffer size");                    
                     skip_next_line = false; // Reset the flag
                 } 
                 else
@@ -136,7 +141,7 @@ bool Config_Save(Config* config, char* filename)
     int32_t fd = API_FS_Open(filename, FS_O_RDWR | FS_O_CREAT | FS_O_TRUNC, 0);
     if ( fd < 0)
     {
-        Trace(1,"Open file failed:%d",fd);
+        LOGE("Open file failed:%d",fd);
 	    return false;
     }
 
@@ -149,13 +154,13 @@ bool Config_Save(Config* config, char* filename)
                            config->entries[i].value);
 
         if (len < 0 || len >= sizeof(line)) {
-            Trace(1, "Line too long to write (entry %d)", i);
+            LOGE("Line too long to write (entry %d)", i);
             API_FS_Close(fd);
             return false;
         }
 
         if (API_FS_Write(fd, line, len) != len) {
-            Trace(1, "Write failed at entry %d", i);
+            LOGE("Write failed at entry %d", i);
             API_FS_Close(fd);
             return false;
         }        
@@ -191,6 +196,15 @@ char* Config_GetValue(Config* config, const char* key, char* out_buffer, size_t 
     }
 
     return NULL;
+}
+
+float Config_GetValueFloat(Config* config, const char* key)
+{
+    char buf[32];
+    const char* val = Config_GetValue(config, key, buf, sizeof(buf));
+    if (!val || !*val)
+        return NAN;
+    return (float)atof(val);
 }
 
 bool Config_SetValue(Config* config, char* key, char* value) 
@@ -254,3 +268,38 @@ void Config_Purge(Config* config)
 {
     config->count = 0;
 };
+
+void ConfigStore_Init()
+{
+    Config_Purge(&g_ConfigStore);
+    Config_SetValue(&g_ConfigStore, KEY_APN, DEFAULT_APN_VALUE);
+    Config_SetValue(&g_ConfigStore, KEY_APN_USER, DEFAULT_APN_USER_VALUE);
+    Config_SetValue(&g_ConfigStore, KEY_APN_PASS, DEFAULT_APN_PASS_VALUE);
+    Config_SetValue(&g_ConfigStore, KEY_TRACKING_SERVER_ADDR, DEFAULT_TRACKING_SERVER_ADDR);
+    Config_SetValue(&g_ConfigStore, KEY_TRACKING_SERVER_PORT, DEFAULT_TRACKING_SERVER_PORT);
+    Config_SetValue(&g_ConfigStore, KEY_TRACKING_SERVER_PROTOCOL, DEFAULT_TRACKING_SERVER_PROTOCOL);
+    Config_SetValue(&g_ConfigStore, KEY_LOG_LEVEL, log_level_to_string(DEFAULT_LOG_LEVEL));
+    Config_SetValue(&g_ConfigStore, KEY_GPS_UERE, DEFAULT_GPS_UERE);
+
+    if (!Config_Load(&g_ConfigStore, CONFIG_FILE_PATH))
+    {
+        LOGE("load config file failed");
+    }
+
+    // for the first run. when config.ini does not exist the device name should default to IMEI
+    char *device_name = Config_GetValue(&g_ConfigStore, KEY_DEVICE_NAME, NULL, 0);
+    if ((device_name == NULL) || (device_name[0] == '\0'))
+    {
+        char IMEI[16];
+        memset(IMEI, 0, sizeof(IMEI));
+        if(INFO_GetIMEI(IMEI))
+            Config_SetValue(&g_ConfigStore, KEY_DEVICE_NAME, IMEI);
+        else
+            Config_SetValue(&g_ConfigStore, KEY_DEVICE_NAME, DEFAULT_DEVICE_NAME);    
+    }
+ 
+    // after reboot LOG_OUTPUT always defaults to UART
+    Config_SetValue(&g_ConfigStore, KEY_LOG_OUTPUT, log_output_to_string(DEFAULT_LOG_OUTPUT));
+    // after reboot LOG_LEVEL is initialised from Config Store   
+    g_log_level = log_level_to_int(Config_GetValue(&g_ConfigStore, KEY_LOG_LEVEL, NULL, 0));
+}
