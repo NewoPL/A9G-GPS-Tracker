@@ -386,7 +386,7 @@ void gps_trackingTask(void *pData)
 
         uint32_t loop_end = time(NULL);
         uint32_t loop_duration = (loop_end - loop_start);
-        uint32_t desired_interval = 10; // target loop period in ms (e.g., 10 seconds)
+        uint32_t desired_interval = 10; // target loop period in seconds (e.g., 10 seconds)
 
         if (loop_duration > desired_interval) loop_duration = desired_interval;
         OS_Sleep((desired_interval - loop_duration)*1000);
