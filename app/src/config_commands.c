@@ -5,12 +5,12 @@
 #include <api_info.h>
 #include <api_hal_pm.h>
 
-#include "gps.h"
-#include "debug.h"
+#include "gps_tracker.h"
 #include "config_store.h"
 #include "config_commands.h"
 #include "config_validation.h"
-#include "gps_tracker.h"
+#include "debug.h"
+#include "gps.h"
 
 typedef void (*UartCmdHandler)(char*);
 

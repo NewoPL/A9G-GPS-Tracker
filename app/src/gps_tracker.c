@@ -17,14 +17,14 @@
 #include "gps.h"
 #include "gps_parse.h"
 
-#include "debug.h"
 #include "system.h"
 #include "gps_tracker.h"
-#include "network.h"
-#include "config_commands.h"
 #include "config_store.h"
+#include "config_commands.h"
 #include "led_handler.h"
+#include "network.h"
 #include "utils.h"
+#include "debug.h"
 
 #define MAIN_TASK_STACK_SIZE    (2048 * 2)
 #define MAIN_TASK_PRIORITY      0

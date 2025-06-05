@@ -7,11 +7,11 @@
 #include <api_fs.h>
 #include <api_info.h>
 
-#include "debug.h"
 #include "gps_tracker.h"
-#include "config_validation.h"
-#include "config_commands.h"
 #include "config_store.h"
+#include "config_commands.h"
+#include "config_validation.h"
+#include "debug.h"
 
 t_Config g_ConfigStore;
 

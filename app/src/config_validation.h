@@ -23,4 +23,6 @@ extern const size_t       g_config_map_size;
  */
 t_config_map* getConfigMap(const char* arg_name);
 
+const char* LogLevelSerializer(const void* value);
+
 #endif // CONFIG_VALIDATION_H

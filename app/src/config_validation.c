@@ -1,11 +1,11 @@
-#include <string.h>
+#include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
-#include "debug.h"
+#include "gps_tracker.h"
 #include "config_store.h"
 #include "config_validation.h"
-#include "gps_tracker.h"
-
+#include "debug.h"
 
 // Validators
 bool DeviceNameValidate(const char* value);
@@ -22,7 +22,6 @@ bool GpsLoggingValidate(const char* value);
 // Serializers
 const char* StringSerializer(const void* value);
 const char* FloatSerializer(const void* value);
-const char* LogLevelSerializer(const void* value);
 const char* LogOutputSerializer(const void* value);
 const char* BoolSerializer(const void* value);
 
@@ -42,13 +41,12 @@ const t_config_map g_config_map[] = {
 
 const size_t g_config_map_size = sizeof(g_config_map)/sizeof(g_config_map[0]);
 
-
 // Returns a pointer to the config map entry for a given argument name (key)
 t_config_map* getConfigMap(const char* arg_name) {
     if (!arg_name) return NULL;
     for (size_t i = 0; i < g_config_map_size; ++i) {
         if (strcmp(g_config_map[i].param_name, arg_name) == 0) {
-            return &g_config_map[i];
+            return (t_config_map*)&g_config_map[i];
         }
     }
     return NULL;
@@ -155,12 +153,14 @@ bool LogOutputValidate(const char* value) {
     return false;
 }
 
+
 // GPS UERE: float >0 and <100
 bool GpsUereValidate(const char* value) {
     if (!value) return false;
-    char* endptr;
-    float uere = strtof(value, &endptr);
-    if (*endptr == '\0' && uere > 0.0f && uere < 100.0f) {
+
+    float uere = atof(value);
+    // We cannot detect conversion errors with atof()
+    if (uere > 0.0f && uere < 100.0f) {
         g_ConfigStore.gps_uere = uere;
         return true;
     }
@@ -200,15 +200,24 @@ const char* FloatSerializer(const void* value)
 const char* LogLevelSerializer(const void* value)
 {
     if (!value) return NULL;
-    snprintf(serializer_buf, sizeof(serializer_buf), "%s", log_level_to_string(*(const int*)value));
-    return serializer_buf;
+    switch (*(const int*)value) {
+        case LOG_LEVEL_ERROR: return "ERROR";
+        case LOG_LEVEL_WARN:  return "WARN";
+        case LOG_LEVEL_INFO:  return "INFO";
+        case LOG_LEVEL_DEBUG: return "DEBUG";
+    }
+    return "";
 }
 
 const char* LogOutputSerializer(const void* value)
 {
     if (!value) return NULL;
-    snprintf(serializer_buf, sizeof(serializer_buf), "%s", log_level_to_string(*(const int*)value));
-    return serializer_buf;
+    switch (*(const int*)value) {
+        case LOGGER_OUTPUT_UART:  return "UART";
+        case LOGGER_OUTPUT_TRACE: return "TRACE";
+        case LOGGER_OUTPUT_FILE:  return "FILE";
+    }    
+    return "";
 }
 
 const char* BoolSerializer(const void* value)
@@ -217,3 +226,6 @@ const char* BoolSerializer(const void* value)
     snprintf(serializer_buf, sizeof(serializer_buf), "%s", *((const int*)value) ? "true" : "false");
     return serializer_buf;
 }
+
+
+
