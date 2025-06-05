@@ -17,6 +17,7 @@
 #include "gps.h"
 #include "gps_parse.h"
 
+#include "debug.h"
 #include "system.h"
 #include "gps_tracker.h"
 #include "network.h"
@@ -24,7 +25,6 @@
 #include "config_store.h"
 #include "led_handler.h"
 #include "utils.h"
-#include "debug.h"
 
 #define MAIN_TASK_STACK_SIZE    (2048 * 2)
 #define MAIN_TASK_PRIORITY      0
@@ -79,9 +79,9 @@ bool AttachActivate()
         if(!status)
         {
             LOGI("activating the network");
-            Config_GetValue(&g_ConfigStore, KEY_APN,      NetContext.apn,        sizeof(NetContext.apn));
-            Config_GetValue(&g_ConfigStore, KEY_APN_USER, NetContext.userName,   sizeof(NetContext.userName));
-            Config_GetValue(&g_ConfigStore, KEY_APN_PASS, NetContext.userPasswd, sizeof(NetContext.userPasswd));
+            strncpy(NetContext.apn,      g_ConfigStore.apn,      sizeof(NetContext.apn));
+            strncpy(NetContext.userName, g_ConfigStore.apn_user, sizeof(NetContext.userName));
+            strncpy(NetContext.userPasswd, g_ConfigStore.apn_pass, sizeof(NetContext.userPasswd));
             ret = Network_StartActive(NetContext);
             if(!ret) {
                LOGE("network activate failed");
@@ -301,7 +301,7 @@ void gps_trackingTask(void *pData)
     if(!GPS_SetOutputInterval(1000))
         LOGE("set GPS interval failed");
     
-    const char *device_name = Config_GetValue(&g_ConfigStore, KEY_DEVICE_NAME, NULL, 0);
+    const char *device_name = g_ConfigStore.device_name;
     LOGI("Device name: %s", device_name);
 
     while(1)
@@ -327,8 +327,8 @@ void gps_trackingTask(void *pData)
             
             float accuracy0 = minmea_tofloat(&gpsInfo->gsa[0].hdop);
 
-            float gps_uere = Config_GetValueFloat(&g_ConfigStore, KEY_GPS_UERE);
-            float accuracy  = gps_uere * accuracy0;
+            float gps_uere = g_ConfigStore.gps_uere;
+            float accuracy = gps_uere * accuracy0;
 
             uint8_t percent;
             PM_Voltage(&percent);
@@ -359,9 +359,9 @@ void gps_trackingTask(void *pData)
 
             if(IS_GSM_STATUS_ON())
             {
-                const char* serverName = Config_GetValue(&g_ConfigStore, KEY_TRACKING_SERVER_ADDR,     NULL, 0);
-                const char* serverPort = Config_GetValue(&g_ConfigStore, KEY_TRACKING_SERVER_PORT,     NULL, 0);
-                const char* protocol   = Config_GetValue(&g_ConfigStore, KEY_TRACKING_SERVER_PROTOCOL, NULL, 0);
+                const char* serverName = g_ConfigStore.server_addr;
+                const char* serverPort = g_ConfigStore.server_port;
+                const char* protocol   = g_ConfigStore.server_protocol;
                 SSL_Config_t *SSLparam = NULL;
                 if (strcmp(protocol, "https") == 0) SSLparam = &SSLconfig;
                 else if (strcmp(protocol, "http") != 0) {

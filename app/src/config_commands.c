@@ -9,22 +9,20 @@
 #include "debug.h"
 #include "config_store.h"
 #include "config_commands.h"
+#include "config_validation.h"
 #include "gps_tracker.h"
 
 typedef void (*UartCmdHandler)(char*);
 
 void HandleHelpCommand(char*);
-void HandleConfigCommand(char*);
 void HandleLsCommand(char*);
 void HandleRemoveFileCommand(char*);
 void HandleSetCommand(char*);
 void HandleGetCommand(char*);
 void HandleTailCommand(char*);
-void HandleLogLevelCommand(char*);
 void HandleGpsLogCommand(char*);
 void HandleRestartCommand(char*);
 void HandleNetworkActivateCommand(char*);
-void HandleSetUERECommand(char*);
 
 struct uart_cmd_entry {
     const char* cmd;
@@ -36,40 +34,15 @@ struct uart_cmd_entry {
 
 static struct uart_cmd_entry uart_cmd_table[] = {
     {"help",     4, HandleHelpCommand,       "help",                    "Show this help message"},
-    {"config",   6, HandleConfigCommand,     "config",                  "Print all configuration"},
     {"ls",       2, HandleLsCommand,         "ls [path]",               "List files in specified folder (default: /)"},
     {"rm",       2, HandleRemoveFileCommand, "rm <file>",               "Remove file at specified path"},
     {"set",      3, HandleSetCommand,        "set <param> [value]",     "Set value to a specified parameter. if no value provided parameter will be cleared."},
-    {"get",      3, HandleGetCommand,        "get <param>",             "Print a value of a specified parameter"},
+    {"get",      3, HandleGetCommand,        "get [para]",              "Print a value of a specified parameter. (default: Print all configuration)"},
     {"tail",     4, HandleTailCommand,       "tail <file> [bytes]",     "Print last [bytes] of file (default: 500)"},
-    {"loglevel", 8, HandleLogLevelCommand,   "loglevel [level]",        "Set or print log level (error, warn, info, debug)"},
     {"gpslog",   6, HandleGpsLogCommand,     "gpslog <enable/disable>", "enable/disable gps output to file"},
     {"restart",  7, HandleRestartCommand,    "restart",                 "Restart the system immediately"},
-    {"netactivate", 11, HandleNetworkActivateCommand, "netactivate",    "Activate (attach and activate) the network"},
-    {"set_uere", 8, HandleSetUERECommand, "set_UERE <value>", "Set GPS UERE parameter (float >0 and <100)"},
+    {"netactivate", 11, HandleNetworkActivateCommand, "netactivate",    "Activate (attach and activate) the network"}
 };
-
-static const char* get_config_key_by_param(const char* param)
-{
-    struct { const char* param; const char* key; } param_map[] = {
-        {"server",      KEY_TRACKING_SERVER_ADDR},
-        {"port",        KEY_TRACKING_SERVER_PORT},
-        {"protocol",    KEY_TRACKING_SERVER_PROTOCOL},
-        {"apn",         KEY_APN},
-        {"apn_user",    KEY_APN_USER},
-        {"apn_pass",    KEY_APN_PASS},
-        {"log_level",   KEY_LOG_LEVEL},
-        {"log_output",  KEY_LOG_OUTPUT},
-        {"device_name", KEY_DEVICE_NAME},
-        {"gps_uere",    KEY_GPS_UERE},
-    };
-    for (unsigned i = 0; i < sizeof(param_map)/sizeof(param_map[0]); ++i) {
-        if (strcmp(param, param_map[i].param) == 0) {
-            return param_map[i].key;
-        }
-    }
-    return NULL;
-}
 
 void HandleSetCommand(char* param)
 {
@@ -81,7 +54,6 @@ void HandleSetCommand(char* param)
 
     // Find the first space (if any)
     char* space = strchr(param, ' ');
-    char* field = param;
     char* value = NULL;
     if (space) {
         *space = '\0';
@@ -91,46 +63,47 @@ void HandleSetCommand(char* param)
         value = (char*)"";
     }
 
-    const char* key = get_config_key_by_param(field);
-    if (!key) {
+    t_config_map *configMap = getConfigMap(param);
+    if (!configMap) {
         UART_Printf("unknown variable\r\n");
         return;
     }
 
-    if (!Config_SetValue(&g_ConfigStore, (char*)key, value))
-    {
-        LOGE("Failed to set %s", field);
+    if (!configMap->validator(value)) {
+        UART_Printf("invalid value for %s\r\n", param);
         return;
     }
 
-    if (!Config_Save(&g_ConfigStore, CONFIG_FILE_PATH))
+    if (!ConfigStore_Save(CONFIG_FILE_PATH))
         LOGE("Failed to save config file");
 
-    UART_Printf("Set %s to '%s'\r\n", field, value);
+    UART_Printf("Set %s to '%s'\r\n", param, value);
     return;
 }
 
 void HandleGetCommand(char* param)
 {
-    char* field = trim_whitespace(param);
-    if (!field) {
-        UART_Printf("missing variable\r\n");
+    param = trim_whitespace(param);
+
+    if (*param == '\0') {
+        UART_Printf("Current configuration:\r\n");
+        for (size_t i = 0; i < g_config_map_size; ++i) {
+            const t_config_map *configMap = &g_config_map[i];
+            UART_Printf("%-20s : %s\r\n",
+                configMap->param_name, 
+                configMap->serializer(configMap->value));
+        }
         return;
     }
 
-    const char* key = get_config_key_by_param(field);
-    if (!key) {
+    t_config_map *configMap = getConfigMap(param);
+    if (!configMap) {
         UART_Printf("unknown variable\r\n");
         return;
     }
-
-    const char* value = Config_GetValue(&g_ConfigStore, key, NULL, 0);
-    if (value==NULL) {
-        UART_Printf("internal error.\r\n");
-        return;
-    }
-
-    UART_Printf("%s: %s\r\n", param, value);
+    UART_Printf("%-20s : %s\r\n",
+        configMap->param_name, 
+        configMap->serializer(configMap->value));
     return;
 }
 
@@ -250,22 +223,6 @@ void HandleTailCommand(char* args)
     API_FS_Close(fd);
 }
 
-void HandleLogLevelCommand(char* param)
-{
-    param = trim_whitespace(param);
-    if (!param || !*param) {
-        // Print current log level if no argument is given
-        const char* current = Config_GetValue(&g_ConfigStore, KEY_LOG_LEVEL, NULL, 0);
-        UART_Printf("Current log level: %s\r\n", current ? current : "unknown");
-        return;
-    }
-    LogLevel level = log_level_to_int(param);
-    set_log_level(level);
-    Config_SetValue(&g_ConfigStore, KEY_LOG_LEVEL, param);
-    Config_Save(&g_ConfigStore, CONFIG_FILE_PATH);
-    UART_Printf("Log level set to %s\r\n", param);
-}
-
 void HandleGpsLogCommand(char* param)
 {
     param = trim_whitespace(param);
@@ -295,40 +252,6 @@ void HandleNetworkActivateCommand(char* param)
     } else {
         UART_Printf("Network activation failed.\r\n");
     }
-}
-
-void HandleSetUERECommand(char* param) {
-    param = trim_whitespace(param);
-    if (!*param) {
-        UART_Printf("missing value\r\n");
-        return;
-    }
-    float val = atof(param);
-    if (val <= 0.0f || val > 100.0f) {
-        UART_Printf("invalid value (must be >0 and <100)\r\n");
-        return;
-    }
-    char buf[16];
-    snprintf(buf, sizeof(buf), "%g", val);
-    if (!Config_SetValue(&g_ConfigStore, (char*)KEY_GPS_UERE, buf)) {
-        UART_Printf("failed to set gps_uere\r\n");
-        return;
-    }
-    UART_Printf("gps_uere set to %s\r\n", buf);
-}
-
-void HandleConfigCommand(char* args)
-{
-    UART_Printf("Current configuration:\r\n");
-    UART_Printf("  server      : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_TRACKING_SERVER_ADDR, NULL, 0));
-    UART_Printf("  port        : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_TRACKING_SERVER_PORT, NULL, 0));
-    UART_Printf("  protocol    : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_TRACKING_SERVER_PROTOCOL, NULL, 0));
-    UART_Printf("  apn         : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_APN, NULL, 0));
-    UART_Printf("  apn_user    : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_APN_USER, NULL, 0));
-    UART_Printf("  apn_pass    : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_APN_PASS, NULL, 0));
-    UART_Printf("  log_level   : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_LOG_LEVEL, NULL, 0));
-    UART_Printf("  log_output  : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_LOG_OUTPUT, NULL, 0));
-    UART_Printf("  device_name : %s\r\n", Config_GetValue(&g_ConfigStore, KEY_DEVICE_NAME, NULL, 0));
 }
 
 void HandleHelpCommand(char* args)
