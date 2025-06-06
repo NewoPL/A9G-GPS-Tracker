@@ -54,8 +54,10 @@ bool ConfigStore_Load(char* filename)
     }
 
     char buffer[MAX_LINE_LENGTH];
-    int leftover = 0; // number of characters in the buffer remained to be processed 
-    bool skip_next_line = false; // Flag to skip the next line if it doesn't fit into the buffer
+    // Flag to skip the next line if it doesn't fit into the buffer
+    bool skip_next_line = false; 
+    // number of characters in the buffer remained to be processed from previous chunk
+    int leftover = 0; 
 
     while (true)
     {
@@ -68,44 +70,57 @@ bool ConfigStore_Load(char* filename)
         }
 
         leftover += read_bytes;
-        if (leftover <= 0) break; // EOF
+        // break the loop if the end of file is reached. no characters to process in the buffer
+        if (leftover <= 0) break;
 
         char* curr_position = buffer;  // pointer to the position in the buffer to start parsing from
-        buffer[leftover] = '\0';  // Null terminate the buffer to ensure it's a valid string
+        buffer[leftover] = '\0';       // Null terminate the buffer to ensure it's a valid string
+
+        // Find the next newline character
+        char* line_end = strchr(curr_position, '\n'); 
+        
+        // if there is no new line character in the full buffer set to skip the next line 
+        // and read the next part of the file
+        if ((line_end == NULL) &&  (leftover >= sizeof(buffer) - 1)
+        {
+            LOGD("Buffer overflow, skipping long line");
+            skip_next_line = true; // Skip the entire line if it does not fit into the buffer
+            leftover = 0;          // Move processing past the current buffer
+            continue;
+        }
 
         // Find lines using strchr instead of strtok
         while (curr_position < buffer + leftover)
         {
-            char* line_end = strchr(curr_position, '\n'); // Find the next newline character
-
-            // If we reach the end of the file and there's no newline, process the remaining buffer
             if ((line_end == NULL) && API_FS_IsEndOfFile(fd))
             {
+                // if we reached here
+                // it means we have the last line that does not end with a newline
+                // process the remaining buffer
                 line_end = buffer + leftover;
             } 
 
-            if (line_end != NULL)
+            // No more newlines found, break the loop
+            if (line_end == NULL) break;
+
+            if (skip_next_line)
             {
-                if (skip_next_line)
-                {
-                    LOGW("Skipping long line exceeding buffer size");                    
-                    skip_next_line = false; // Reset the flag
-                } 
-                else
-                {
-                    *line_end = '\0';  // Null terminate the line
-                    // Try to parse the line into a key-value pair
-                    parse_line(curr_position);
-                }
-                curr_position = line_end + 1; // Move past the newline character
-            } else {
-                if (curr_position == buffer)
-                {
-                    skip_next_line = true; // Skip the entire line if it does not fit into the buffer
-                    curr_position = buffer + leftover; // Move processing past the current buffer
-                }
-                break;  // No more newlines, break out of the loop
+                LOGW("Skipping long line exceeding buffer size");                    
+                skip_next_line = false; // Reset the flag
+            } 
+            else
+            {
+                *line_end = '\0';  // Null terminate the line
+                // Try to parse the line into a key-value pair
+                parse_line(curr_position);
             }
+            curr_position = line_end + 1; // Move past the newline character
+            
+            // If we moved past the valid data in the buffer, break the loop
+            if (curr_position >= buffer + leftover) break;
+            
+            // Find the next newline character
+            line_end = strchr(curr_position, '\n');
         }
 
         // If there are leftover characters after processing lines, move them to the beginning of the buffer
