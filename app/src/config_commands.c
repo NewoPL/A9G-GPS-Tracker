@@ -22,7 +22,6 @@ void HandleRemoveFileCommand(char*);
 void HandleSetCommand(char*);
 void HandleGetCommand(char*);
 void HandleTailCommand(char*);
-void HandleGpsLogCommand(char*);
 void HandleRestartCommand(char*);
 void HandleNetworkActivateCommand(char*);
 
@@ -41,7 +40,6 @@ static struct uart_cmd_entry uart_cmd_table[] = {
     {"set",          3, HandleSetCommand,             "set <param> [value]",     "Set value to a specified parameter. if no value provided parameter will be cleared."},
     {"get",          3, HandleGetCommand,             "get [para]",              "Print a value of a specified parameter. (for no parameter it prints all config)"},
     {"tail",         4, HandleTailCommand,            "tail <file> [bytes]",     "Print last [bytes] of file (default: 500 bytes)"},
-    {"gpslog",       6, HandleGpsLogCommand,          "gpslog <enable/disable>", "enable/disable gps output to file"},
     {"restart",      7, HandleRestartCommand,         "restart",                 "Restart the system immediately"},
     {"netactivate", 11, HandleNetworkActivateCommand, "netactivate",             "Activate (attach and activate) the network"}
 };
@@ -223,20 +221,6 @@ void HandleTailCommand(char* args)
     }
     UART_Printf("\r\n");
     API_FS_Close(fd);
-}
-
-void HandleGpsLogCommand(char* param)
-{
-    param = trim_whitespace(param);
-    if (strcmp(param, "enable") == 0) {
-        GPS_SaveLog(true, GPS_NMEA_LOG_FILE_PATH);
-        UART_Printf("GPS logging enabled.\r\n");
-    } else if (strcmp(param, "disable") == 0) {
-        GPS_SaveLog(false, GPS_NMEA_LOG_FILE_PATH);
-        UART_Printf("GPS logging disabled.\r\n");
-    } else {
-        UART_Printf("Usage: gpslog <enable|disable>\r\n");
-    }
 }
 
 void HandleRestartCommand(char* args)

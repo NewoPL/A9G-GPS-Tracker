@@ -222,6 +222,7 @@ bool GpsLoggingValidate(const char* value)
         (str_case_cmp(value, "false") == 0))
     {
         g_ConfigStore.gps_logging = false;
+        GPS_SaveLog(false, GPS_NMEA_LOG_FILE_PATH);
         return true;
     } 
     if ((str_case_cmp(value, "1") == 0) || 
@@ -230,6 +231,7 @@ bool GpsLoggingValidate(const char* value)
         (str_case_cmp(value, "true") == 0)) 
     {
         g_ConfigStore.gps_logging = true;
+        GPS_SaveLog(true, GPS_NMEA_LOG_FILE_PATH);
         return true;
     }
     return false;

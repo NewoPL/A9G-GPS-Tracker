@@ -261,9 +261,6 @@ void gps_trackingTask(void *pData)
 {
     while (!IS_INITIALIZED() || !IS_GSM_STATUS_ON()) OS_Sleep(2000);
 
-    GPS_Info_t* gpsInfo = Gps_GetInfo();
-    GPS_SaveLog(false, GPS_NMEA_LOG_FILE_PATH);
- 
     // open GPS hardware(UART2 open either)
     GPS_Open(NULL);
     LOGI("Waiting for GPS");
@@ -305,7 +302,8 @@ void gps_trackingTask(void *pData)
 
     while(1)
     {
-        uint32_t loop_start = time(NULL);
+        GPS_Info_t* gpsInfo = Gps_GetInfo();
+        uint32_t    loop_start = time(NULL);
         if(IS_GPS_STATUS_ON() && (gpsInfo->rmc.valid))
         {
             if(!Network_GetCellInfoRequst()) {
@@ -380,7 +378,8 @@ void gps_trackingTask(void *pData)
         }
         else
         {
-            LOGE("No GPS fix");
+            LOGE("No GPS fix. SAT visible: %d, SAT tracked:%d", 
+                 gpsInfo->gsv[0].total_sats, gpsInfo->gga.satellites_tracked);
         }
 
         uint32_t loop_end = time(NULL);
