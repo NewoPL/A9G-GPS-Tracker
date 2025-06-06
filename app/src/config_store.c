@@ -49,8 +49,15 @@ bool ConfigStore_Load(char* filename)
     int32_t fd = API_FS_Open(filename, FS_O_RDWR | FS_O_CREAT, 0);
     if (fd < 0)
     {
-        LOGD("Open file failed: %d", fd);
+        LOGD("Open file %s failed. err= %d", filename, fd);
         return false;
+    }
+
+    int file_size = (int)API_FS_GetFileSize(fd);
+    if (file_size <=0)
+    {
+        LOGD("File %s is empty. err= %d", filename, file_size);
+        return true;
     }
 
     char buffer[MAX_LINE_LENGTH];
@@ -68,8 +75,9 @@ bool ConfigStore_Load(char* filename)
             API_FS_Close(fd);
             return false;
         }
-
+        file_size -= read_bytes; 
         leftover += read_bytes;
+        
         // break the loop if the end of file is reached. no characters to process in the buffer
         if (leftover <= 0) break;
 
@@ -81,7 +89,7 @@ bool ConfigStore_Load(char* filename)
         
         // if there is no new line character in the full buffer set to skip the next line 
         // and read the next part of the file
-        if ((line_end == NULL) &&  (leftover >= sizeof(buffer) - 1)
+        if ((line_end == NULL) &&  (leftover >= sizeof(buffer) - 1))
         {
             LOGD("Buffer overflow, skipping long line");
             skip_next_line = true; // Skip the entire line if it does not fit into the buffer
@@ -92,7 +100,7 @@ bool ConfigStore_Load(char* filename)
         // Find lines using strchr instead of strtok
         while (curr_position < buffer + leftover)
         {
-            if ((line_end == NULL) && API_FS_IsEndOfFile(fd))
+            if ((line_end == NULL) && (file_size <= 0))
             {
                 // if we reached here
                 // it means we have the last line that does not end with a newline
