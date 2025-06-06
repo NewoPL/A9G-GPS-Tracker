@@ -86,11 +86,11 @@ bool ProtocolValidate(const char* value)
 {
     if (!value) return false;
     if (str_case_cmp(value, "http") == 0) {
-        g_ConfigStore.logOutput = PROT_HTTP;
+        g_ConfigStore.server_protocol = PROT_HTTP;
         return true;
     } 
     if (str_case_cmp(value, "https") == 0) {
-        g_ConfigStore.logOutput = PROT_HTTPS;
+        g_ConfigStore.server_protocol = PROT_HTTPS;
         return true;
     } 
     return false;
