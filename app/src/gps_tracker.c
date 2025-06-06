@@ -147,6 +147,7 @@ void FsInfoTest()
     if(API_FS_GetFSInfo(FS_DEVICE_NAME_T_FLASH, &fsInfo) < 0)
     {
         LOGE("Get Ext Flash device info fail!");
+        return;
     }
     sizeUsed  = fsInfo.usedSize;
     sizeTotal = fsInfo.totalSize;
@@ -228,8 +229,10 @@ void EventHandler(API_Event_t* pEvent)
             break;
 
         case API_EVENT_ID_GPS_UART_RECEIVED:
-            LOGD("received GPS data, length:%d, data:%s",pEvent->param1,pEvent->pParam1);
-            GPS_Update(pEvent->pParam1, pEvent->param1);
+            if (g_ConfigStore.gps_logging) {
+                LOGD("received GPS data, length:%d, data:\r\n%s",pEvent->param1,pEvent->pParam1);
+                GPS_Update(pEvent->pParam1, pEvent->param1);
+            }
 
             GPS_Info_t* gpsInfo = Gps_GetInfo();
             if (gpsInfo->rmc.valid) GPS_FIX_ON(); else GPS_FIX_OFF();
@@ -256,10 +259,6 @@ uint8_t responseBuffer[1024];
 
 void gps_trackingTask(void *pData)
 {
-    // wait for initialization
-    LOGI("Initialization");
-    LED_cycle_start(gpsTaskHandle);
-    FsInfoTest();
     while (!IS_INITIALIZED() || !IS_GSM_STATUS_ON()) OS_Sleep(2000);
 
     GPS_Info_t* gpsInfo = Gps_GetInfo();
@@ -361,11 +360,11 @@ void gps_trackingTask(void *pData)
             {
                 const char* serverName = g_ConfigStore.server_addr;
                 const char* serverPort = g_ConfigStore.server_port;
-                const char* protocol   = g_ConfigStore.server_protocol;
+                t_protocol  protocol   = g_ConfigStore.server_protocol;
                 SSL_Config_t *SSLparam = NULL;
-                if (strcmp(protocol, "https") == 0) SSLparam = &SSLconfig;
-                else if (strcmp(protocol, "http") != 0) {
-                    LOGE("unknown protocol: %s", protocol);
+                if (protocol == PROT_HTTPS) SSLparam = &SSLconfig;
+                else if (protocol != PROT_HTTP) {
+                    LOGE("unknown protocol: %d", protocol);
                     continue;
                 }
 
@@ -409,9 +408,13 @@ void gps_MainTask(void *pData)
 
     PM_PowerEnable(POWER_TYPE_VPAD,true);
     UART_Init(UART1, config);
+    
+    UART_Printf("Initialization ...\r\n");
     ConfigStore_Init();
+    FsInfoTest();    
     LED_init();
     GPS_Init();    
+    LED_cycle_start(gpsTaskHandle);
 
     OS_CreateTask(gps_trackingTask,
             NULL, NULL, MAIN_TASK_STACK_SIZE, MAIN_TASK_PRIORITY, 0, 0, MAIN_TASK_NAME);

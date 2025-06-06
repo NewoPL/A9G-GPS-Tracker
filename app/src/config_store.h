@@ -4,7 +4,6 @@
 #define MAX_LINE_LENGTH             256
 #define MAX_SERVER_ADDR_LENGTH      64
 #define MAX_SERVER_PORT_LENGTH      8
-#define MAX_SERVER_PROTOCOL_LENGTH  16
 #define MAX_APN_LENGTH              32
 #define MAX_APN_USER_LENGTH         32
 #define MAX_DEVICE_NAME_LENGTH      32
@@ -21,6 +20,12 @@
 #define PARAM_LOG_OUTPUT            "log_output"
 #define PARAM_GPS_UERE              "gps_uere"
 #define PARAM_GPS_LOGS              "gps_logging"
+
+// Protocol
+typedef enum {
+    PROT_HTTP = 0,
+    PROT_HTTPS
+} t_protocol;
 
 // Log levels
 typedef enum {
@@ -39,16 +44,16 @@ typedef enum {
 } t_logOutput;
 
 typedef struct {
-    char  imei[MAX_IMEI_LENGTH];
-    char  device_name[MAX_DEVICE_NAME_LENGTH];
-    char  server_addr[MAX_SERVER_ADDR_LENGTH];
-    char  server_port[MAX_SERVER_PORT_LENGTH];
-    char  server_protocol[MAX_SERVER_PROTOCOL_LENGTH];
-    char  apn[MAX_APN_LENGTH];
-    char  apn_user[MAX_APN_USER_LENGTH];
-    char  apn_pass[MAX_APN_USER_LENGTH];
-    float gps_uere;
-    bool  gps_logging;
+    char        imei[MAX_IMEI_LENGTH];
+    char        device_name[MAX_DEVICE_NAME_LENGTH];
+    char        server_addr[MAX_SERVER_ADDR_LENGTH];
+    char        server_port[MAX_SERVER_PORT_LENGTH];
+    t_protocol  server_protocol;
+    char        apn[MAX_APN_LENGTH];
+    char        apn_user[MAX_APN_USER_LENGTH];
+    char        apn_pass[MAX_APN_USER_LENGTH];
+    float       gps_uere;
+    bool        gps_logging;
     t_logLevel  logLevel;
     t_logOutput logOutput;
 } t_Config;
@@ -83,13 +88,5 @@ void ConfigStore_Init(void);
  * @return true if the file was saved successfully, false otherwise.
  */
 bool ConfigStore_Save(char* filename);
-
-/**
- * @brief Trim leading and trailing whitespace from a string in place.
- *
- * @param str The string to trim.
- * @return Pointer to the trimmed string.
- */
-char* trim_whitespace(char* str);
 
 #endif // CONFIG_STORE_H

@@ -6,6 +6,7 @@
 #include <api_ssl.h>
 
 #include "gps_tracker.h"
+#include "config_store.h"
 #include "network.h"
 #include "debug.h"
 

@@ -9,6 +9,8 @@
 #include "config_store.h"
 #include "config_commands.h"
 #include "config_validation.h"
+#include "minmea.h"
+#include "utils.h"
 #include "debug.h"
 #include "gps.h"
 
@@ -33,15 +35,15 @@ struct uart_cmd_entry {
 };
 
 static struct uart_cmd_entry uart_cmd_table[] = {
-    {"help",     4, HandleHelpCommand,       "help",                    "Show this help message"},
-    {"ls",       2, HandleLsCommand,         "ls [path]",               "List files in specified folder (default: /)"},
-    {"rm",       2, HandleRemoveFileCommand, "rm <file>",               "Remove file at specified path"},
-    {"set",      3, HandleSetCommand,        "set <param> [value]",     "Set value to a specified parameter. if no value provided parameter will be cleared."},
-    {"get",      3, HandleGetCommand,        "get [para]",              "Print a value of a specified parameter. (default: Print all configuration)"},
-    {"tail",     4, HandleTailCommand,       "tail <file> [bytes]",     "Print last [bytes] of file (default: 500)"},
-    {"gpslog",   6, HandleGpsLogCommand,     "gpslog <enable/disable>", "enable/disable gps output to file"},
-    {"restart",  7, HandleRestartCommand,    "restart",                 "Restart the system immediately"},
-    {"netactivate", 11, HandleNetworkActivateCommand, "netactivate",    "Activate (attach and activate) the network"}
+    {"help",         4, HandleHelpCommand,            "help",                    "Show this help message"},
+    {"ls",           2, HandleLsCommand,              "ls [path]",               "List files in specified folder (default: /)"},
+    {"rm",           2, HandleRemoveFileCommand,      "rm <file>",               "Remove file at specified path"},
+    {"set",          3, HandleSetCommand,             "set <param> [value]",     "Set value to a specified parameter. if no value provided parameter will be cleared."},
+    {"get",          3, HandleGetCommand,             "get [para]",              "Print a value of a specified parameter. (for no parameter it prints all config)"},
+    {"tail",         4, HandleTailCommand,            "tail <file> [bytes]",     "Print last [bytes] of file (default: 500 bytes)"},
+    {"gpslog",       6, HandleGpsLogCommand,          "gpslog <enable/disable>", "enable/disable gps output to file"},
+    {"restart",      7, HandleRestartCommand,         "restart",                 "Restart the system immediately"},
+    {"netactivate", 11, HandleNetworkActivateCommand, "netactivate",             "Activate (attach and activate) the network"}
 };
 
 void HandleSetCommand(char* param)
@@ -75,7 +77,7 @@ void HandleSetCommand(char* param)
     }
 
     if (!ConfigStore_Save(CONFIG_FILE_PATH))
-        LOGE("Failed to save config file");
+        LOGE("Failed to save config file: %s", CONFIG_FILE_PATH);
 
     UART_Printf("Set %s to '%s'\r\n", param, value);
     return;
@@ -101,7 +103,7 @@ void HandleGetCommand(char* param)
         UART_Printf("unknown variable\r\n");
         return;
     }
-    UART_Printf("%-20s : %s\r\n",
+    UART_Printf("%s : %s\r\n",
         configMap->param_name, 
         configMap->serializer(configMap->value));
     return;

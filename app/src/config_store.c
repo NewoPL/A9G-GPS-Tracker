@@ -11,48 +11,34 @@
 #include "config_store.h"
 #include "config_commands.h"
 #include "config_validation.h"
+#include "minmea.h"
+#include "utils.h"
 #include "debug.h"
 
 t_Config g_ConfigStore;
 
-char* trim_whitespace(char* str)
-{
-    if (!str) return NULL;
-
-    // trim leading whitespace
-    while (isspace((unsigned char)*str)) str++;
-
-    // if there were only whitespaces
-    if (*str == '\0') return str;
-
-    // trim trailing whitespace
-    char* end = str + strlen(str) - 1;
-    while (end > str && isspace((unsigned char)*end)) end--;
-
-    end[1] = '\0';
-    return str;
-}
-
 static bool parse_line(char* line)
 {
     if (!line) return false;
-    char* trimmed = trim_whitespace(line);
-    if (trimmed[0] == '\0' || trimmed[0] == '#')
-        return false;
-    char* equals = strchr(trimmed, '=');
-    if (!equals)
-        return false;
-    *equals = '\0';
-    t_config_map* entry = getConfigMap(trimmed);
+
+    char* value = strchr(line, '=');
+    if (!value) return false;
+    *value = '\0';
+
+    line  = trim_whitespace(line);
+    value = trim_whitespace(++value);
+
+    t_config_map* entry = getConfigMap(line);
     if (!entry) {
-        LOGE("Unknown config key: %s", trimmed);
+        LOGE("Unknown config key: %s", line);
         return false;
     }
-    if (!entry->validator(equals + 1)) {
-        LOGE("Invalid value for %s: %s", trimmed, equals + 1);
+
+    if (!entry->validator(value)) {
+        LOGE("Invalid value for %s: %s", line, value);
         return false;
     }
-    // Set value logic would go here
+
     return true;
 }
 
@@ -63,7 +49,7 @@ bool ConfigStore_Load(char* filename)
     int32_t fd = API_FS_Open(filename, FS_O_RDWR | FS_O_CREAT, 0);
     if (fd < 0)
     {
-        LOGE("Open file failed: %d", fd);
+        LOGD("Open file failed: %d", fd);
         return false;
     }
 
@@ -76,7 +62,7 @@ bool ConfigStore_Load(char* filename)
         int32_t read_bytes = API_FS_Read(fd, buffer + leftover, sizeof(buffer) - leftover - 1);
         if (read_bytes < 0)
         {
-            LOGE("Read error: %d", read_bytes);
+            LOGD("Read error: %d", read_bytes);
             API_FS_Close(fd);
             return false;
         }
@@ -102,7 +88,7 @@ bool ConfigStore_Load(char* filename)
             {
                 if (skip_next_line)
                 {
-                    LOGD("Skipping long line exceeding buffer size");                    
+                    LOGW("Skipping long line exceeding buffer size");                    
                     skip_next_line = false; // Reset the flag
                 } 
                 else
@@ -154,11 +140,11 @@ bool ConfigStore_Save(char* filename)
             continue;
         }
 
-        size_t len = snprintf(line_to_save, sizeof(line_to_save)-1, "%-20s = %s\r\n", 
+        int len = snprintf(line_to_save, sizeof(line_to_save)-1, "%-20s = %s\r\n", 
                  g_config_map[i].param_name, value_str);
         line_to_save[len] = '\0'; // Ensure null termination
-
-        if (API_FS_Write(fd, (char*)value_str, len) != len) {
+        
+        if (API_FS_Write(fd, line_to_save, len) != len) {
             LOGE("Write failed for %s", g_config_map[i].param_name);
             continue;
         }
@@ -176,23 +162,23 @@ void ConfigStore_Init()
     if(entry && INFO_GetIMEI(g_ConfigStore.imei))
         entry->default_value = g_ConfigStore.imei;
     else
-        LOGE("Failed to get imei, using default device name: %s", DEFAULT_DEVICE_NAME);
+        UART_Printf("Failed to get imei, using default device name: %s", DEFAULT_DEVICE_NAME);
 
     // For each config entry, validate and set default value
     for (size_t index = 0; index < g_config_map_size; ++index) {
         entry = (t_config_map*)&g_config_map[index];
-        if (!entry || !entry->validator) {
-            LOGE("No validator for config map entry: %s", entry ? entry->param_name : "(null)");
+        if (!entry->validator) {
+            UART_Printf("No validator for config map entry: %s\r\n", entry->param_name);
             continue; // Skip if no validator is defined
         }
         if (!entry->validator(entry->default_value)) {
-            LOGE("Invalid default value for %s: %s", entry->param_name, entry->default_value);
+            UART_Printf("Invalid default value for %s: %s\r\n", entry->param_name, entry->default_value);
             continue; // Skip if default value is invalid
         }
     }
 
     if (!ConfigStore_Load(CONFIG_FILE_PATH))
     {
-        LOGE("load config file failed");
+        LOGE("loading config file failed: %s",CONFIG_FILE_PATH);
     }
 }
