@@ -229,15 +229,15 @@ void EventHandler(API_Event_t* pEvent)
             break;
 
         case API_EVENT_ID_GPS_UART_RECEIVED:
-            if (g_ConfigStore.gps_logging) {
+            if (g_ConfigStore.gps_logging)
                 LOGD("received GPS data, length:%d, data:\r\n%s",pEvent->param1,pEvent->pParam1);
-                GPS_Update(pEvent->pParam1, pEvent->param1);
-            }
+
+            GPS_STATUS_ON();
+            GPS_Update(pEvent->pParam1, pEvent->param1);
 
             GPS_Info_t* gpsInfo = Gps_GetInfo();
             if (gpsInfo->rmc.valid) GPS_FIX_ON(); else GPS_FIX_OFF();
 
-            GPS_STATUS_ON();
             break;
         
         case API_EVENT_ID_UART_RECEIVED:
