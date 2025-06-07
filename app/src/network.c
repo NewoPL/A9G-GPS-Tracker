@@ -85,12 +85,11 @@ static inline int http_send_receive(const char *hostName,
         totalSent += ret;
     }
 
-    struct fd_set fds;
-    struct timeval timeout = {12, 0};
     uint16_t recvLen = 0;
-
     while (recvLen < retBufferSize)
     {
+        struct fd_set fds;
+        struct timeval timeout = {12, 0};
         FD_ZERO(&fds);
         FD_SET(fd, &fds);
 

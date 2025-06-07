@@ -330,6 +330,7 @@ void gps_trackingTask(void *pData)
             uint8_t percent;
             PM_Voltage(&percent);
 
+            /*
             snprintf(responseBuffer, sizeof(responseBuffer),"%02d.%02d.%02d %02d:%02d.%02d, "
                                                             "sat visible:%d, sat tracked:%d, "
                                                             "Lat:%f, Lon:%f, alt:%f, "
@@ -343,6 +344,7 @@ void gps_trackingTask(void *pData)
 
             //send to UART1
             UART_Write(UART1, responseBuffer, strlen(responseBuffer));
+            */
 
             responseBuffer[0] = '\0';
             if (strlen(g_cellInfo) != 0) {
@@ -369,7 +371,7 @@ void gps_trackingTask(void *pData)
                 if (Http_Post(SSLparam, serverName, serverPort, "/", requestBuffer, strlen(requestBuffer), responseBuffer, sizeof(responseBuffer)) < 0)
                     LOGE("FAILED to send the location to the server");
                 else
-                    LOGI("Sent location to %s", serverName);
+                    LOGE("Sent location to %s", serverName);
             }
             else
             {

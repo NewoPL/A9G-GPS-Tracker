@@ -8,6 +8,7 @@
 #include "minmea.h"
 #include "utils.h"
 #include "debug.h"
+#include "gps.h"
 
 // Validators
 bool DeviceNameValidate(const char* value);

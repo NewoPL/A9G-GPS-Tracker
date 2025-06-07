@@ -12,7 +12,6 @@
 #include "minmea.h"
 #include "utils.h"
 #include "debug.h"
-#include "gps.h"
 
 typedef void (*UartCmdHandler)(char*);
 
