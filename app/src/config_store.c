@@ -8,118 +8,127 @@
 #include <api_info.h>
 
 #include "gps_tracker.h"
-#include "config_commands.h"
 #include "config_store.h"
+#include "config_commands.h"
+#include "config_validation.h"
+#include "minmea.h"
+#include "utils.h"
 #include "debug.h"
 
-Config g_ConfigStore;
+t_Config g_ConfigStore;
 
-char* trim_whitespace(char* str)
-{
-    if (!str) return NULL;
-
-    // trim leading whitespace
-    while (isspace((unsigned char)*str)) str++;
-
-    // if there were only whitespaces
-    if (*str == '\0') return str;
-
-    // trim trailing whitespace
-    char* end = str + strlen(str) - 1;
-    while (end > str && isspace((unsigned char)*end)) end--;
-
-    end[1] = '\0';
-    return str;
-}
-
-static bool parse_line(Config* config, char* line)
+static bool parse_line(char* line)
 {
     if (!line) return false;
 
-    // Trim whitespace
-    char* trimmed = trim_whitespace(line);
+    char* value = strchr(line, '=');
+    if (!value) return false;
+    *value = '\0';
 
-    // Skip empty lines or comments
-    if (trimmed[0] == '\0' || trimmed[0] == '#')
+    line  = trim_whitespace(line);
+    value = trim_whitespace(++value);
+
+    t_config_map* entry = getConfigMap(line);
+    if (!entry) {
+        LOGE("Unknown config key: %s", line);
         return false;
+    }
 
-    // Find '=' separator
-    char* equals = strchr(trimmed, '=');
-    if (!equals)
+    if (!entry->validator(value)) {
+        LOGE("Invalid value for %s: %s", line, value);
         return false;
+    }
 
-    // Split key and value
-    *equals = '\0';
-    
-    // Save key and value in stored config
-    return Config_SetValue(config, trimmed, equals + 1);
+    return true;
 }
 
-bool Config_Load(Config* config, char* filename)
+bool ConfigStore_Load(char* filename)
 {
-    if (!config || !filename)
-        return false;
+    if (!filename) return false;
 
     int32_t fd = API_FS_Open(filename, FS_O_RDWR | FS_O_CREAT, 0);
     if (fd < 0)
     {
-        LOGE("Open file failed: %d", fd);
+        LOGD("Open file %s failed. err= %d", filename, fd);
         return false;
     }
 
+    int file_size = (int)API_FS_GetFileSize(fd);
+    if (file_size <=0)
+    {
+        LOGD("File %s is empty. err= %d", filename, file_size);
+        return true;
+    }
+
     char buffer[MAX_LINE_LENGTH];
-    int leftover = 0; // number of characters in the buffer remained to be processed 
-    bool skip_next_line = false; // Flag to skip the next line if it doesn't fit into the buffer
+    // Flag to skip the next line if it doesn't fit into the buffer
+    bool skip_next_line = false; 
+    // number of characters in the buffer remained to be processed from previous chunk
+    int leftover = 0; 
 
     while (true)
     {
         int32_t read_bytes = API_FS_Read(fd, buffer + leftover, sizeof(buffer) - leftover - 1);
         if (read_bytes < 0)
         {
-            LOGE("Read error: %d", read_bytes);
+            LOGD("Read error: %d", read_bytes);
             API_FS_Close(fd);
             return false;
         }
-
+        file_size -= read_bytes; 
         leftover += read_bytes;
-        if (leftover <= 0) break; // EOF
+        
+        // break the loop if the end of file is reached. no characters to process in the buffer
+        if (leftover <= 0) break;
 
         char* curr_position = buffer;  // pointer to the position in the buffer to start parsing from
-        buffer[leftover] = '\0';  // Null terminate the buffer to ensure it's a valid string
+        buffer[leftover] = '\0';       // Null terminate the buffer to ensure it's a valid string
+
+        // Find the next newline character
+        char* line_end = strchr(curr_position, '\n'); 
+        
+        // if there is no new line character in the full buffer set to skip the next line 
+        // and read the next part of the file
+        if ((line_end == NULL) &&  (leftover >= sizeof(buffer) - 1))
+        {
+            LOGD("Buffer overflow, skipping long line");
+            skip_next_line = true; // Skip the entire line if it does not fit into the buffer
+            leftover = 0;          // Move processing past the current buffer
+            continue;
+        }
 
         // Find lines using strchr instead of strtok
         while (curr_position < buffer + leftover)
         {
-            char* line_end = strchr(curr_position, '\n'); // Find the next newline character
-
-            // If we reach the end of the file and there's no newline, process the remaining buffer
-            if ((line_end == NULL) && API_FS_IsEndOfFile(fd))
+            if ((line_end == NULL) && (file_size <= 0))
             {
+                // if we reached here
+                // it means we have the last line that does not end with a newline
+                // process the remaining buffer
                 line_end = buffer + leftover;
             } 
 
-            if (line_end != NULL)
+            // No more newlines found, break the loop
+            if (line_end == NULL) break;
+
+            if (skip_next_line)
             {
-                if (skip_next_line)
-                {
-                    LOGD("Skipping long line exceeding buffer size");                    
-                    skip_next_line = false; // Reset the flag
-                } 
-                else
-                {
-                    *line_end = '\0';  // Null terminate the line
-                    // Try to parse the line into a key-value pair
-                    parse_line(config, curr_position);
-                }
-                curr_position = line_end + 1; // Move past the newline character
-            } else {
-                if (curr_position == buffer)
-                {
-                    skip_next_line = true; // Skip the entire line if it does not fit into the buffer
-                    curr_position = buffer + leftover; // Move processing past the current buffer
-                }
-                break;  // No more newlines, break out of the loop
+                LOGW("Skipping long line exceeding buffer size");                    
+                skip_next_line = false; // Reset the flag
+            } 
+            else
+            {
+                *line_end = '\0';  // Null terminate the line
+                // Try to parse the line into a key-value pair
+                parse_line(curr_position);
             }
+            curr_position = line_end + 1; // Move past the newline character
+            
+            // If we moved past the valid data in the buffer, break the loop
+            if (curr_position >= buffer + leftover) break;
+            
+            // Find the next newline character
+            line_end = strchr(curr_position, '\n');
         }
 
         // If there are leftover characters after processing lines, move them to the beginning of the buffer
@@ -133,37 +142,35 @@ bool Config_Load(Config* config, char* filename)
     return true;       // Successfully loaded the config
 }
 
-bool Config_Save(Config* config, char* filename)
+bool ConfigStore_Save(char* filename)
 {
-    if (!config || !filename)
-        return false;
+    if (!filename) return false;
 
     int32_t fd = API_FS_Open(filename, FS_O_RDWR | FS_O_CREAT | FS_O_TRUNC, 0);
-    if ( fd < 0)
+    if (fd < 0)
     {
-        LOGE("Open file failed:%d",fd);
-	    return false;
+        LOGE("Open config file failed: %d", fd);
+        return false;
     }
 
-    for (int i = 0; i < config->count; ++i)
-    {
-        char line[MAX_LINE_LENGTH];
+    static char line_to_save[MAX_LINE_LENGTH];
 
-        int len = snprintf(line, sizeof(line), "%s=%s\n",
-                           config->entries[i].key,
-                           config->entries[i].value);
+    for (size_t i = 0; i < g_config_map_size; ++i) {
+        const char* value_str = g_config_map[i].serializer(g_config_map[i].value);
 
-        if (len < 0 || len >= sizeof(line)) {
-            LOGE("Line too long to write (entry %d)", i);
-            API_FS_Close(fd);
-            return false;
+        if (value_str == NULL) {
+            LOGE("Serializer for %s failed.", g_config_map[i].param_name);
+            continue;
         }
 
-        if (API_FS_Write(fd, line, len) != len) {
-            LOGE("Write failed at entry %d", i);
-            API_FS_Close(fd);
-            return false;
-        }        
+        int len = snprintf(line_to_save, sizeof(line_to_save)-1, "%-20s = %s\r\n", 
+                 g_config_map[i].param_name, value_str);
+        line_to_save[len] = '\0'; // Ensure null termination
+        
+        if (API_FS_Write(fd, line_to_save, len) != len) {
+            LOGE("Write failed for %s", g_config_map[i].param_name);
+            continue;
+        }
     }
 
     API_FS_Flush(fd);
@@ -171,135 +178,30 @@ bool Config_Save(Config* config, char* filename)
     return true;
 }
 
-char* Config_GetValue(Config* config, const char* key, char* out_buffer, size_t buffer_len)
-{
-    if (!config || !key)
-        return NULL;
-
-    for (int i = 0; i < config->count; ++i)
-    {
-        if (strcmp(config->entries[i].key, key) == 0)
-        {
-            if (out_buffer && buffer_len > 0)
-            {
-                // Copy value safely to out_buffer
-                strncpy(out_buffer, config->entries[i].value, buffer_len - 1);
-                out_buffer[buffer_len - 1] = '\0'; // Ensure null-termination
-                return out_buffer;
-            }
-            else
-            {
-                // Return internal pointer if no buffer provided
-                return config->entries[i].value;
-            }
-        }
-    }
-
-    return NULL;
-}
-
-float Config_GetValueFloat(Config* config, const char* key)
-{
-    char buf[32];
-    const char* val = Config_GetValue(config, key, buf, sizeof(buf));
-    if (!val || !*val)
-        return NAN;
-    return (float)atof(val);
-}
-
-bool Config_SetValue(Config* config, char* key, char* value) 
-{
-    if (!config || !key || !value)
-        return false;
-
-    key = trim_whitespace(key);
-    value = trim_whitespace(value);
-
-    // Validate lengths
-    size_t key_len = strlen(key);
-    size_t value_len = strlen(value);
-    
-    // Reject if key is empty or too long
-    if (key_len == 0 || key_len >= MAX_KEY_LENGTH - 1)
-        return false;
-
-    // Reject if value is too long
-    if (value_len >= MAX_VALUE_LENGTH - 1)
-        return false;
-
-    for (int i = 0; i < config->count; ++i)
-    {
-        if (strcmp(config->entries[i].key, key) == 0) {
-            strncpy(config->entries[i].value, value, MAX_VALUE_LENGTH);
-            return true;
-        }
-    }
-
-    if (config->count >= MAX_CONFIG_LINES)
-        return false;
-
-    strncpy(config->entries[config->count].key, key, MAX_KEY_LENGTH);
-    strncpy(config->entries[config->count].value, value, MAX_VALUE_LENGTH);
-    config->count++;
-
-    return true;
-}
-
-bool Config_RemoveKey(Config* config, char* key)
-{
-    if (!config || !key)
-        return false;
-
-    for (int i = 0; i < config->count; ++i)
- {
-        if (strcmp(config->entries[i].key, key) == 0)
-        {
-            for (int j = i; j < config->count - 1; ++j) {
-                config->entries[j] = config->entries[j + 1];
-            }
-            config->count--;
-            return true;
-        }
-    }
-    return false;
-}
-
-void Config_Purge(Config* config)
-{
-    config->count = 0;
-};
-
 void ConfigStore_Init()
 {
-    Config_Purge(&g_ConfigStore);
-    Config_SetValue(&g_ConfigStore, KEY_APN, DEFAULT_APN_VALUE);
-    Config_SetValue(&g_ConfigStore, KEY_APN_USER, DEFAULT_APN_USER_VALUE);
-    Config_SetValue(&g_ConfigStore, KEY_APN_PASS, DEFAULT_APN_PASS_VALUE);
-    Config_SetValue(&g_ConfigStore, KEY_TRACKING_SERVER_ADDR, DEFAULT_TRACKING_SERVER_ADDR);
-    Config_SetValue(&g_ConfigStore, KEY_TRACKING_SERVER_PORT, DEFAULT_TRACKING_SERVER_PORT);
-    Config_SetValue(&g_ConfigStore, KEY_TRACKING_SERVER_PROTOCOL, DEFAULT_TRACKING_SERVER_PROTOCOL);
-    Config_SetValue(&g_ConfigStore, KEY_LOG_LEVEL, log_level_to_string(DEFAULT_LOG_LEVEL));
-    Config_SetValue(&g_ConfigStore, KEY_GPS_UERE, DEFAULT_GPS_UERE);
+    memset(g_ConfigStore.imei, 0, sizeof(g_ConfigStore.imei));
+    t_config_map* entry = getConfigMap(PARAM_DEVICE_NAME);
+    if(entry && INFO_GetIMEI(g_ConfigStore.imei))
+        entry->default_value = g_ConfigStore.imei;
+    else
+        UART_Printf("Failed to get imei, using default device name: %s", DEFAULT_DEVICE_NAME);
 
-    if (!Config_Load(&g_ConfigStore, CONFIG_FILE_PATH))
-    {
-        LOGE("load config file failed");
+    // For each config entry, validate and set default value
+    for (size_t index = 0; index < g_config_map_size; ++index) {
+        entry = (t_config_map*)&g_config_map[index];
+        if (!entry->validator) {
+            UART_Printf("No validator for config map entry: %s\r\n", entry->param_name);
+            continue; // Skip if no validator is defined
+        }
+        if (!entry->validator(entry->default_value)) {
+            UART_Printf("Invalid default value for %s: %s\r\n", entry->param_name, entry->default_value);
+            continue; // Skip if default value is invalid
+        }
     }
 
-    // for the first run. when config.ini does not exist the device name should default to IMEI
-    char *device_name = Config_GetValue(&g_ConfigStore, KEY_DEVICE_NAME, NULL, 0);
-    if ((device_name == NULL) || (device_name[0] == '\0'))
+    if (!ConfigStore_Load(CONFIG_FILE_PATH))
     {
-        char IMEI[16];
-        memset(IMEI, 0, sizeof(IMEI));
-        if(INFO_GetIMEI(IMEI))
-            Config_SetValue(&g_ConfigStore, KEY_DEVICE_NAME, IMEI);
-        else
-            Config_SetValue(&g_ConfigStore, KEY_DEVICE_NAME, DEFAULT_DEVICE_NAME);    
+        LOGE("loading config file failed: %s",CONFIG_FILE_PATH);
     }
- 
-    // after reboot LOG_OUTPUT always defaults to UART
-    Config_SetValue(&g_ConfigStore, KEY_LOG_OUTPUT, log_output_to_string(DEFAULT_LOG_OUTPUT));
-    // after reboot LOG_LEVEL is initialised from Config Store   
-    g_log_level = log_level_to_int(Config_GetValue(&g_ConfigStore, KEY_LOG_LEVEL, NULL, 0));
 }

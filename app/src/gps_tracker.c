@@ -19,10 +19,10 @@
 
 #include "system.h"
 #include "gps_tracker.h"
-#include "network.h"
-#include "config_commands.h"
 #include "config_store.h"
+#include "config_commands.h"
 #include "led_handler.h"
+#include "network.h"
 #include "utils.h"
 #include "debug.h"
 
@@ -79,9 +79,9 @@ bool AttachActivate()
         if(!status)
         {
             LOGI("activating the network");
-            Config_GetValue(&g_ConfigStore, KEY_APN,      NetContext.apn,        sizeof(NetContext.apn));
-            Config_GetValue(&g_ConfigStore, KEY_APN_USER, NetContext.userName,   sizeof(NetContext.userName));
-            Config_GetValue(&g_ConfigStore, KEY_APN_PASS, NetContext.userPasswd, sizeof(NetContext.userPasswd));
+            strncpy(NetContext.apn,      g_ConfigStore.apn,      sizeof(NetContext.apn));
+            strncpy(NetContext.userName, g_ConfigStore.apn_user, sizeof(NetContext.userName));
+            strncpy(NetContext.userPasswd, g_ConfigStore.apn_pass, sizeof(NetContext.userPasswd));
             ret = Network_StartActive(NetContext);
             if(!ret) {
                LOGE("network activate failed");
@@ -147,6 +147,7 @@ void FsInfoTest()
     if(API_FS_GetFSInfo(FS_DEVICE_NAME_T_FLASH, &fsInfo) < 0)
     {
         LOGE("Get Ext Flash device info fail!");
+        return;
     }
     sizeUsed  = fsInfo.usedSize;
     sizeTotal = fsInfo.totalSize;
@@ -228,13 +229,15 @@ void EventHandler(API_Event_t* pEvent)
             break;
 
         case API_EVENT_ID_GPS_UART_RECEIVED:
-            LOGD("received GPS data, length:%d, data:%s",pEvent->param1,pEvent->pParam1);
+            if (g_ConfigStore.gps_logging)
+                LOGD("received GPS data, length:%d, data:\r\n%s",pEvent->param1,pEvent->pParam1);
+
+            GPS_STATUS_ON();
             GPS_Update(pEvent->pParam1, pEvent->param1);
 
             GPS_Info_t* gpsInfo = Gps_GetInfo();
             if (gpsInfo->rmc.valid) GPS_FIX_ON(); else GPS_FIX_OFF();
 
-            GPS_STATUS_ON();
             break;
         
         case API_EVENT_ID_UART_RECEIVED:
@@ -256,15 +259,8 @@ uint8_t responseBuffer[1024];
 
 void gps_trackingTask(void *pData)
 {
-    // wait for initialization
-    LOGI("Initialization");
-    LED_cycle_start(gpsTaskHandle);
-    FsInfoTest();
     while (!IS_INITIALIZED() || !IS_GSM_STATUS_ON()) OS_Sleep(2000);
 
-    GPS_Info_t* gpsInfo = Gps_GetInfo();
-    GPS_SaveLog(false, GPS_NMEA_LOG_FILE_PATH);
- 
     // open GPS hardware(UART2 open either)
     GPS_Open(NULL);
     LOGI("Waiting for GPS");
@@ -301,12 +297,13 @@ void gps_trackingTask(void *pData)
     if(!GPS_SetOutputInterval(1000))
         LOGE("set GPS interval failed");
     
-    const char *device_name = Config_GetValue(&g_ConfigStore, KEY_DEVICE_NAME, NULL, 0);
+    const char *device_name = g_ConfigStore.device_name;
     LOGI("Device name: %s", device_name);
 
     while(1)
     {
-        uint32_t loop_start = time(NULL);
+        GPS_Info_t* gpsInfo = Gps_GetInfo();
+        uint32_t    loop_start = time(NULL);
         if(IS_GPS_STATUS_ON() && (gpsInfo->rmc.valid))
         {
             if(!Network_GetCellInfoRequst()) {
@@ -327,12 +324,13 @@ void gps_trackingTask(void *pData)
             
             float accuracy0 = minmea_tofloat(&gpsInfo->gsa[0].hdop);
 
-            float gps_uere = Config_GetValueFloat(&g_ConfigStore, KEY_GPS_UERE);
-            float accuracy  = gps_uere * accuracy0;
+            float gps_uere = g_ConfigStore.gps_uere;
+            float accuracy = gps_uere * accuracy0;
 
             uint8_t percent;
             PM_Voltage(&percent);
 
+            /*
             snprintf(responseBuffer, sizeof(responseBuffer),"%02d.%02d.%02d %02d:%02d.%02d, "
                                                             "sat visible:%d, sat tracked:%d, "
                                                             "Lat:%f, Lon:%f, alt:%f, "
@@ -346,6 +344,7 @@ void gps_trackingTask(void *pData)
 
             //send to UART1
             UART_Write(UART1, responseBuffer, strlen(responseBuffer));
+            */
 
             responseBuffer[0] = '\0';
             if (strlen(g_cellInfo) != 0) {
@@ -359,20 +358,20 @@ void gps_trackingTask(void *pData)
 
             if(IS_GSM_STATUS_ON())
             {
-                const char* serverName = Config_GetValue(&g_ConfigStore, KEY_TRACKING_SERVER_ADDR,     NULL, 0);
-                const char* serverPort = Config_GetValue(&g_ConfigStore, KEY_TRACKING_SERVER_PORT,     NULL, 0);
-                const char* protocol   = Config_GetValue(&g_ConfigStore, KEY_TRACKING_SERVER_PROTOCOL, NULL, 0);
+                const char* serverName = g_ConfigStore.server_addr;
+                const char* serverPort = g_ConfigStore.server_port;
+                t_protocol  protocol   = g_ConfigStore.server_protocol;
                 SSL_Config_t *SSLparam = NULL;
-                if (strcmp(protocol, "https") == 0) SSLparam = &SSLconfig;
-                else if (strcmp(protocol, "http") != 0) {
-                    LOGE("unknown protocol: %s", protocol);
+                if (protocol == PROT_HTTPS) SSLparam = &SSLconfig;
+                else if (protocol != PROT_HTTP) {
+                    LOGE("unknown protocol: %d", protocol);
                     continue;
                 }
 
                 if (Http_Post(SSLparam, serverName, serverPort, "/", requestBuffer, strlen(requestBuffer), responseBuffer, sizeof(responseBuffer)) < 0)
                     LOGE("FAILED to send the location to the server");
                 else
-                    LOGI("Sent location to %s", serverName);
+                    LOGE("Sent location to %s", serverName);
             }
             else
             {
@@ -381,7 +380,8 @@ void gps_trackingTask(void *pData)
         }
         else
         {
-            LOGE("No GPS fix");
+            LOGE("No GPS fix. SAT visible: %d, SAT tracked:%d", 
+                 gpsInfo->gsv[0].total_sats, gpsInfo->gga.satellites_tracked);
         }
 
         uint32_t loop_end = time(NULL);
@@ -409,9 +409,13 @@ void gps_MainTask(void *pData)
 
     PM_PowerEnable(POWER_TYPE_VPAD,true);
     UART_Init(UART1, config);
+    
+    UART_Printf("Initialization ...\r\n");
     ConfigStore_Init();
+    FsInfoTest();    
     LED_init();
     GPS_Init();    
+    LED_cycle_start(gpsTaskHandle);
 
     OS_CreateTask(gps_trackingTask,
             NULL, NULL, MAIN_TASK_STACK_SIZE, MAIN_TASK_PRIORITY, 0, 0, MAIN_TASK_NAME);
