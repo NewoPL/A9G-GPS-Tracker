@@ -3,60 +3,16 @@
 #include <stdarg.h>
 #include <string.h>
 
-#include "api_fs.h"
+#include <api_fs.h>
 #include <api_hal_uart.h>
 
-#include "debug.h"
+#include "config_store.h"
 #include "config_commands.h"
+#include "config_validation.h"
+#include "minmea.h"
+#include "debug.h"
 
-int32_t      g_log_file;
-LogLevel     g_log_level  = DEFAULT_LOG_LEVEL;
-LoggerOutput g_log_output = DEFAULT_LOG_OUTPUT;
-
-char* log_level_to_string(LogLevel level)
-{
-    switch (level) {
-        case LOG_LEVEL_ERROR: return "ERROR";
-        case LOG_LEVEL_WARN:  return "WARN";
-        case LOG_LEVEL_INFO:  return "INFO";
-        case LOG_LEVEL_DEBUG: return "DEBUG";
-        default:              return "UNKNOWN";
-    }
-}
-
-char* log_output_to_string(LoggerOutput output)
-{
-    switch (output) {
-        case LOGGER_OUTPUT_UART:  return "UART";
-        case LOGGER_OUTPUT_TRACE: return "TRACE";
-        case LOGGER_OUTPUT_FILE:  return "FILE";
-        default:                  return "UNKNOWN";
-    }
-}
-
-LogLevel log_level_to_int(const char* str)
-{
-    char buf[16];
-    size_t i;
-    for (i = 0; i < sizeof(buf) - 1 && str[i]; ++i)
-        buf[i] = toupper((unsigned char)str[i]);
-    buf[i] = '\0';
-
-    if (strcmp(buf, "ERROR") == 0)
-        return LOG_LEVEL_ERROR;
-    else if (strcmp(buf, "WARN") == 0)
-        return LOG_LEVEL_WARN;
-    else if (strcmp(buf, "INFO") == 0)
-        return LOG_LEVEL_INFO;
-    else if (strcmp(buf, "DEBUG") == 0)
-        return LOG_LEVEL_DEBUG;
-    else
-        return LOG_LEVEL_NONE;
-}
-
-void set_log_level(LogLevel level) {
-    g_log_level = level;
-}
+int32_t g_log_file;
 
 void UART_Printf(const char* fmt, ...) 
 {
@@ -96,9 +52,9 @@ int32_t FILE_Printf(const char* fmt, ...)
     return 0;
 }
 
-void log_message_internal(LogLevel level, const char *func, const char *format, ...)
+void log_message_internal(t_logLevel level, const char *func, const char *format, ...)
 {
-    if (level > g_log_level || level == LOG_LEVEL_NONE)
+    if (level > g_ConfigStore.logLevel || level == LOG_LEVEL_NONE)
         return;
 
     char message[LOG_LEVEL_BUFFER_SIZE];
@@ -108,15 +64,15 @@ void log_message_internal(LogLevel level, const char *func, const char *format, 
     va_end(args);
 
     // Get logger output type from ConfigStore
-    switch (g_log_output) {
+    switch (g_ConfigStore.logOutput) {
         case LOGGER_OUTPUT_TRACE:
-            Trace(level, "[%s] %s(): %s", log_level_to_string(level), func, message);
+            Trace(level, "[%s] %s(): %s", LogLevelSerializer(&level), func, message);
             break;
         case LOGGER_OUTPUT_FILE:
-            FILE_Printf("[%s] %s(): %s\n", log_level_to_string(level), func, message);
+            FILE_Printf("[%s] %s(): %s\n", LogLevelSerializer(&level), func, message);
             break;
         default:
-            UART_Printf("[%s] %s(): %s\n", log_level_to_string(level), func, message);
+            UART_Printf("[%s] %s(): %s\n", LogLevelSerializer(&level), func, message);
             break;
     }
 }

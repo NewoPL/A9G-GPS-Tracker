@@ -1,4 +1,8 @@
-#include "gps_parse.h"
+#include <stdbool.h>
+#include <api_inc_time.h>
+
+#include "config_store.h"
+#include "minmea.h"
 #include "utils.h"
 #include "debug.h"
 
@@ -45,4 +49,41 @@ time_t mk_time(const struct minmea_date *date, const struct minmea_time *time_)
                    time_->seconds;
  
     return total;
+}
+
+int str_case_cmp(const char *s1, const char *s2) {
+    while (*s1 && *s2) {
+        char c1 = tolower((unsigned char)*s1);
+        char c2 = tolower((unsigned char)*s2);
+
+        if (c1 != c2) {
+            return (unsigned char)c1 - (unsigned char)c2;
+        }
+
+        s1++;
+        s2++;
+    }
+
+    // If both strings end together, returns 0
+    // If not, compare final characters
+    return (unsigned char)tolower((unsigned char)*s1) - 
+           (unsigned char)tolower((unsigned char)*s2);
+}
+
+char* trim_whitespace(char* str)
+{
+    if (!str) return NULL;
+
+    // trim leading whitespace
+    while (isspace((unsigned char)*str)) str++;
+
+    // if there were only whitespaces
+    if (*str == '\0') return str;
+
+    // trim trailing whitespace
+    char* end = str + strlen(str) - 1;
+    while (end > str && isspace((unsigned char)*end)) end--;
+
+    end[1] = '\0';
+    return str;
 }
