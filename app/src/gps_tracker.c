@@ -16,6 +16,7 @@
 #include "buffer.h"
 #include "gps.h"
 #include "gps_parse.h"
+#include "sms_service.h"
 
 #include "system.h"
 #include "gps_tracker.h"
@@ -26,11 +27,17 @@
 #include "utils.h"
 #include "debug.h"
 
-#define MAIN_TASK_STACK_SIZE    (2048 * 2)
-#define MAIN_TASK_PRIORITY      0
-#define MAIN_TASK_NAME          "GPS Tracker"
+#define MAIN_TASK_STACK_SIZE      (2048 * 2)
+#define MAIN_TASK_PRIORITY        (0)
+#define MAIN_TASK_NAME            "GPS Tracker"
 
-static HANDLE gpsTaskHandle = NULL;
+#define REPORTING_TASK_STACK_SIZE (2048 * 2)
+#define REPORTING_TASK_PRIORITY   (0)
+#define REPORTING_TASK_NAME       "Reporting Task"
+
+HANDLE gpsMainTaskHandle   = NULL;
+HANDLE reportingTaskHandle = NULL;
+
 Network_PDP_Context_t NetContext;
 uint8_t systemStatus = 0;
 uint8_t g_RSSI = 0;
@@ -48,6 +55,10 @@ SSL_Config_t SSLconfig = {
     .verifyMode      = SSL_VERIFY_MODE_OPTIONAL,
     .entropyCustom   = "GPRS"
 };
+
+// Provide last known position for SMS service
+float g_last_latitude = 0.0f;
+float g_last_longitude = 0.0f;
 
 bool AttachActivate()
 {
@@ -228,6 +239,10 @@ void EventHandler(API_Event_t* pEvent)
             INITIALIZED_ON();
             break;
 
+            case API_EVENT_ID_SMS_RECEIVED:
+            HandleSmsReceived(pEvent);
+            break;
+
         case API_EVENT_ID_GPS_UART_RECEIVED:
             if (g_ConfigStore.gps_logging)
                 LOGD("received GPS data, length:%d, data:\r\n%s",pEvent->param1,pEvent->pParam1);
@@ -236,7 +251,13 @@ void EventHandler(API_Event_t* pEvent)
             GPS_Update(pEvent->pParam1, pEvent->param1);
 
             GPS_Info_t* gpsInfo = Gps_GetInfo();
-            if (gpsInfo->rmc.valid) GPS_FIX_ON(); else GPS_FIX_OFF();
+            if (gpsInfo->rmc.valid) {
+                GPS_FIX_ON();
+                g_last_latitude = minmea_tocoord(&gpsInfo->rmc.latitude);
+                g_last_longitude = minmea_tocoord(&gpsInfo->rmc.longitude);
+            } else {
+                GPS_FIX_OFF();
+            }
 
             break;
         
@@ -246,7 +267,7 @@ void EventHandler(API_Event_t* pEvent)
                 uint8_t data[(pEvent->param2 + 1)];
                 data[pEvent->param2] = 0;
                 memcpy(data,pEvent->pParam1,pEvent->param2);
-                HandleUartCommand(data);
+                    HandleUartCommand(data);
             }
             break;
         default:
@@ -415,17 +436,20 @@ void gps_MainTask(void *pData)
     FsInfoTest();    
     LED_init();
     GPS_Init();    
-    LED_cycle_start(gpsTaskHandle);
+    LED_cycle_start(gpsMainTaskHandle);
 
-    OS_CreateTask(gps_trackingTask,
-            NULL, NULL, MAIN_TASK_STACK_SIZE, MAIN_TASK_PRIORITY, 0, 0, MAIN_TASK_NAME);
-
+    reportingTaskHandle = OS_CreateTask(
+        gps_trackingTask, NULL, NULL,
+        REPORTING_TASK_STACK_SIZE,
+        REPORTING_TASK_PRIORITY, 
+        0, 0, REPORTING_TASK_NAME);
+    
     //Dispatch loop
     while(1)
     {
         API_Event_t* event = NULL;
 
-        if(OS_WaitEvent(gpsTaskHandle, (void**)&event, OS_TIME_OUT_WAIT_FOREVER))
+        if(OS_WaitEvent(gpsMainTaskHandle, (void**)&event, OS_TIME_OUT_WAIT_FOREVER))
         {
             EventHandler(event);
             OS_Free(event->pParam1);
@@ -437,7 +461,11 @@ void gps_MainTask(void *pData)
 
 void app_Main(void)
 {
-    gpsTaskHandle = OS_CreateTask(gps_MainTask,
-        NULL, NULL, MAIN_TASK_STACK_SIZE, MAIN_TASK_PRIORITY, 0, 0, MAIN_TASK_NAME);
-    OS_SetUserMainHandle(&gpsTaskHandle);
+    gpsMainTaskHandle = OS_CreateTask(
+        gps_MainTask, NULL, NULL,
+        MAIN_TASK_STACK_SIZE, 
+        MAIN_TASK_PRIORITY,
+        0, 0, MAIN_TASK_NAME);
+
+    OS_SetUserMainHandle(&gpsMainTaskHandle);
 }
