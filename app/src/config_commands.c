@@ -33,14 +33,14 @@ struct uart_cmd_entry {
 };
 
 static struct uart_cmd_entry uart_cmd_table[] = {
-    {"help",         4, HandleHelpCommand,            "help",                    "Show this help message"},
-    {"ls",           2, HandleLsCommand,              "ls [path]",               "List files in specified folder (default: /)"},
-    {"rm",           2, HandleRemoveFileCommand,      "rm <file>",               "Remove file at specified path"},
-    {"set",          3, HandleSetCommand,             "set <param> [value]",     "Set value to a specified parameter. if no value provided parameter will be cleared."},
-    {"get",          3, HandleGetCommand,             "get [para]",              "Print a value of a specified parameter. (for no parameter it prints all config)"},
-    {"tail",         4, HandleTailCommand,            "tail <file> [bytes]",     "Print last [bytes] of file (default: 500 bytes)"},
-    {"restart",      7, HandleRestartCommand,         "restart",                 "Restart the system immediately"},
-    {"netactivate", 11, HandleNetworkActivateCommand, "netactivate",             "Activate (attach and activate) the network"}
+    {"help",         4, HandleHelpCommand,            "help",                "Show this help message"},
+    {"set",          3, HandleSetCommand,             "set <param> [value]", "Set value to a specified parameter. if no value provided parameter will be cleared."},
+    {"get",          3, HandleGetCommand,             "get [para]",          "Print a value of a specified parameter. (for no parameter it prints all config)"},
+    {"ls",           2, HandleLsCommand,              "ls [path]",           "List files in specified folder (default: /)"},
+    {"rm",           2, HandleRemoveFileCommand,      "rm <file>",           "Remove file at specified path"},
+    {"tail",         4, HandleTailCommand,            "tail <file> [bytes]", "Print last [bytes] of file (default: 500 bytes)"},
+    {"restart",      7, HandleRestartCommand,         "restart",             "Restart the system immediately"},
+    {"netactivate", 11, HandleNetworkActivateCommand, "netactivate",         "Activate (attach and activate) the network"}
 };
 
 void HandleSetCommand(char* param)
@@ -246,7 +246,9 @@ void HandleHelpCommand(char* args)
         UART_Printf("  %-24s- %s\r\n", uart_cmd_table[i].syntax, uart_cmd_table[i].help);
     }
     UART_Printf("\r\n  <param> is one of:\r\n");
-    UART_Printf("     address, port, protocol, apn, apn_user, apn_pass, log_level, log_output, device_name\r\n");
+    for (size_t i = 0; i < g_config_map_size; ++i) {
+        UART_Printf("    %s\r\n", g_config_map[i].param_name);
+    }
 }
 
 
