@@ -25,10 +25,10 @@ void SMSInit()
     }
 
     SMS_Parameter_t smsParam = {
-        .fo = 17 ,
-        .vp = 167,
-        .pid= 0  ,
-        .dcs= 8  ,  //0:English 7bit, 4:English 8 bit, 8:Unicode 2 Bytes
+        .fo = 17 , // Format options, 17 means SMS format is Text
+        .vp = 11,  // Validity period, 2 hours
+        .pid= 0  , // Protocol Identifier, 0 means no specific protocol
+        .dcs= 4  , // English 8-bit data (can include some special characters) - up to 140 characters
     };
     
     if(!SMS_SetParameter(&smsParam, SIM0))
@@ -45,7 +45,8 @@ void SMSInit()
 }
 
 // Helper to get last known position as Google Maps link
-static bool GetGoogleMapsLink(char* buf, size_t bufsize) {
+static bool GetGoogleMapsLink(char* buf, size_t bufsize)
+{
     // You may want to use actual last known position from your GPS logic
     // For now, use global config or a stub
     float lat = 0.0f, lon = 0.0f;
@@ -62,7 +63,8 @@ static bool GetGoogleMapsLink(char* buf, size_t bufsize) {
     return true;
 }
 
-void HandleSmsReceived(API_Event_t* pEvent) {
+void HandleSmsReceived(API_Event_t* pEvent)
+{
     SMS_Encode_Type_t encodeType = pEvent->param1;
     uint32_t contentLength = pEvent->param2;
     uint8_t* header = pEvent->pParam1;
@@ -88,8 +90,9 @@ void HandleSmsReceived(API_Event_t* pEvent) {
     }
 }
 
-void SendLocationSms(const char* phoneNumber) {
-    char msg[128];
+void SendLocationSms(const char* phoneNumber)
+{
+    char msg[SMS_BODY_MAX_LEN];
     if (GetGoogleMapsLink(msg, sizeof(msg))) {
         LOGI("Sending location SMS to %s: %s", phoneNumber, msg);
         SMS_SendMessage(phoneNumber, (const uint8_t*)msg, strlen(msg), SIM0);

@@ -2,9 +2,10 @@
 #include <stdlib.h>
 
 #include <api_fs.h>
-#include <api_info.h>
+#include <api_network.h>
 #include <api_hal_pm.h>
 
+#include "gps_parse.h"
 #include "system.h"
 #include "network.h"
 #include "gps_tracker.h"
@@ -26,6 +27,7 @@ void HandleTailCommand(char*);
 void HandleRestartCommand(char*);
 void HandleNetworkActivateCommand(char*);
 void HandleNetworkStatusCommand(char*);
+void HandleLocationCommand(char*);
 
 struct uart_cmd_entry {
     const char* cmd;
@@ -45,6 +47,7 @@ static struct uart_cmd_entry uart_cmd_table[] = {
     {"restart",      7, HandleRestartCommand,         "restart",             "Restart the system immediately"},
     {"netactivate", 11, HandleNetworkActivateCommand, "netactivate",         "Activate (attach and activate) the network"},
     {"netstatus",    9, HandleNetworkStatusCommand,   "netstatus",           "Print network status"},
+    {"location",     8, HandleLocationCommand,        "location",            "Show the last known GPS position"},
 };
 
 void HandleSetCommand(char* param)
@@ -226,19 +229,67 @@ void HandleTailCommand(char* args)
     API_FS_Close(fd);
 }
 
-void HandleRestartCommand(char* args)
+void HandleLocationCommand(char* param)
 {
-    UART_Printf("System restarting...\r\n");
-    PM_Restart();
-}
+    GPS_Info_t* gpsInfo = Gps_GetInfo();
+    
+    // First check if GPS is active
+    if (!IS_GPS_STATUS_ON()) {
+        UART_Printf("GPS is not active.\r\n");
+        return;
+    }
 
-bool AttachActivate();
+    if (!gpsInfo->rmc.valid) {
+        UART_Printf("No valid GPS fix available.\r\n");
+        UART_Printf("Satellites visible: %d, tracked: %d\r\n", 
+                    gpsInfo->gsv[0].total_sats, 
+                    gpsInfo->gga.satellites_tracked);
+    }
+
+    // Convert NMEA coordinates (DDMM.MMMM format) to decimal degrees
+    float latitude = minmea_tocoord(&gpsInfo->rmc.latitude);
+    float longitude = minmea_tocoord(&gpsInfo->rmc.longitude);
+    
+    // Get date and time information
+    char dateTime[32];
+    snprintf(dateTime, sizeof(dateTime), "%02d.%02d.%02d %02d:%02d:%02d UTC", 
+             gpsInfo->rmc.date.year,
+             gpsInfo->rmc.date.month, 
+             gpsInfo->rmc.date.day,
+             gpsInfo->rmc.time.hours,
+             gpsInfo->rmc.time.minutes, 
+             gpsInfo->rmc.time.seconds);
+    
+    // Format and display GPS information
+    UART_Printf("GPS Position (%s):\r\n", dateTime);
+    UART_Printf("  Latitude:  %.6f° %c\r\n", fabs(latitude), (latitude >= 0) ? 'N' : 'S');
+    UART_Printf("  Longitude: %.6f° %c\r\n", fabs(longitude), (longitude >= 0) ? 'E' : 'W');
+    UART_Printf("  Altitude:  %.1f meters\r\n", gpsInfo->gga.altitude);
+    UART_Printf("  Speed:     %.1f km/h\r\n", minmea_tofloat(&gpsInfo->rmc.speed) * 1.852); // Convert knots to km/h
+    UART_Printf("  Course:    %.1f°\r\n", minmea_tofloat(&gpsInfo->rmc.course));
+    UART_Printf("  Satellites tracked: %d\r\n", gpsInfo->gga.satellites_tracked);    UART_Printf("  Fix quality: %d\r\n", gpsInfo->gga.fix_quality);
+    UART_Printf("  HDOP: %.1f\r\n", minmea_tofloat(&gpsInfo->gsa[0].hdop));
+
+}
 
 void HandleNetworkStatusCommand(char* param)
 {
-    UART_Printf("Network registered: %s, active: %s\r\n",
+    UART_Printf("GSM Network registered: %s, active: %s\r\n",
                 IS_GSM_REGISTERED() ? "true" : "false",
                 IS_GSM_ACTIVE() ? "true" : "false");
+    
+    // Get and display IP address if network is active
+    if (IS_GSM_ACTIVE()) {
+        char ip_address[16] = {0};
+        if (Network_GetIp(ip_address, sizeof(ip_address))) {
+            UART_Printf("IP address: %s\r\n", ip_address);
+        } else {
+            UART_Printf("Failed to get IP address\r\n");
+        }
+    } else {
+        UART_Printf("IP address: not available\r\n");
+    }
+
     if (g_cellInfo[0] != 0) {
         UART_Printf("Cell info: %s\r\n", g_cellInfo);
         // Try to parse and print cell info fields if present
@@ -260,6 +311,12 @@ void HandleNetworkActivateCommand(char* param)
     }
 }
 
+void HandleRestartCommand(char* args)
+{
+    UART_Printf("System restarting...\r\n");
+    PM_Restart();
+}
+
 void HandleHelpCommand(char* args)
 {
     UART_Printf("\r\nAvailable commands:\r\n");
@@ -271,7 +328,6 @@ void HandleHelpCommand(char* args)
         UART_Printf("    %s\r\n", g_config_map[i].param_name);
     }
 }
-
 
 void HandleUartCommand(char* cmd)
 {
