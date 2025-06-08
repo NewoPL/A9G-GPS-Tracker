@@ -71,7 +71,7 @@ void HandleSmsReceived(API_Event_t* pEvent)
     trim_whitespace(cmd);
     
     LOGI("SMS received header: %s, encodeType: %d, contentLength: %d", headerStr, encodeType, contentLength);
-    LOGE("SMS content: '%s'", cmd);
+    LOGI("SMS content: '%s'", cmd);
 
     // Only handle ASCII for command parsing
     if (encodeType != SMS_ENCODE_TYPE_ASCII) {

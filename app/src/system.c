@@ -118,10 +118,11 @@ static void EventHandler(API_Event_t* pEvent)
             GPS_Update(pEvent->pParam1, pEvent->param1);
 
             GPS_Info_t* gpsInfo = Gps_GetInfo();
+            g_last_latitude = minmea_tocoord(&gpsInfo->rmc.latitude);
+            g_last_longitude = minmea_tocoord(&gpsInfo->rmc.longitude);
+
             if (gpsInfo->rmc.valid) {
                 GPS_FIX_ON();
-                g_last_latitude = minmea_tocoord(&gpsInfo->rmc.latitude);
-                g_last_longitude = minmea_tocoord(&gpsInfo->rmc.longitude);
             } else {
                 GPS_FIX_OFF();
             }
