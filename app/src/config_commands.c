@@ -248,7 +248,7 @@ void HandleNetworkStatusCommand(char* param)
                 mcc, mnc, lac, cellid, rxlev);
         }
     } else
-        UART_Printf("Cell info not avialable\r\n");
+        UART_Printf("Cell info not available\r\n");
 }
 
 void HandleNetworkActivateCommand(char* param)
