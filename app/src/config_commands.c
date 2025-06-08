@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 #include <api_fs.h>
+#include <api_sms.h>
 #include <api_network.h>
 #include <api_hal_pm.h>
 
@@ -28,6 +29,7 @@ void HandleRestartCommand(char*);
 void HandleNetworkActivateCommand(char*);
 void HandleNetworkStatusCommand(char*);
 void HandleLocationCommand(char*);
+void HandleSmsCommand(char*);
 
 struct uart_cmd_entry {
     const char* cmd;
@@ -48,7 +50,9 @@ static struct uart_cmd_entry uart_cmd_table[] = {
     {"netactivate", 11, HandleNetworkActivateCommand, "netactivate",         "Activate (attach and activate) the network"},
     {"netstatus",    9, HandleNetworkStatusCommand,   "netstatus",           "Print network status"},
     {"location",     8, HandleLocationCommand,        "location",            "Show the last known GPS position"},
+    {"sms",          3, HandleSmsCommand,             "sms [ls|rm <index>]", "List or remove SMS messages (default: ls)"},
 };
+
 
 void HandleSetCommand(char* param)
 {
@@ -327,6 +331,50 @@ void HandleHelpCommand(char* args)
     for (size_t i = 0; i < g_config_map_size; ++i) {
         UART_Printf("    %s\r\n", g_config_map[i].param_name);
     }
+}
+
+void HandleSmsCommand(char* param)
+{
+    param = trim_whitespace(param);
+    if (*param == '\0' || strncmp(param, "ls", 2) == 0) {
+        // List all SMS messages
+        if (!SMS_ListMessageRequst(SMS_STATUS_ALL, SMS_STORAGE_SIM_CARD)) {
+            UART_Printf("Failed to request SMS list.\r\n");
+            return;
+        }
+    } else if (strncmp(param, "rm", 2) == 0) {
+        // Remove SMS message by index
+        param += 2;
+        param = trim_whitespace(param);
+        if (*param == '\0') {
+            UART_Printf("Usage: sms rm <index>\r\n");
+            return;
+        }
+        int idx = atoi(param);
+        if (idx < 0) {
+            UART_Printf("Invalid index.\r\n");
+            return;
+        }
+        if (SMS_DeleteMessage(idx, SMS_STATUS_ALL, SMS_STORAGE_SIM_CARD)) {
+            UART_Printf("Deleted SMS at index %d\r\n", idx);
+        } else {
+            UART_Printf("Failed to delete SMS at index %d\r\n", idx);
+        }
+    } else {
+        UART_Printf("Unknown sms subcommand. Use 'sms', 'sms ls', or 'sms rm <index>'\r\n");
+    }
+}
+
+// Print SMS list message
+void HandleSmsListEvent(SMS_Message_Info_t* msg)
+{
+    UART_Printf("\r\n[SMS index: %d]\r\nFrom: %s\r\nTime: %u/%02u/%02u,%02u:%02u:%02u+%02d\r\nContent: %.*s\r\n\r\n",
+                msg->index,
+                msg->phoneNumber,
+                msg->time.year, msg->time.month, msg->time.day,
+                msg->time.hour, msg->time.minute, msg->time.second,
+                msg->time.timeZone,
+                msg->dataLen, msg->data ? (char*)msg->data : "");
 }
 
 void HandleUartCommand(char* cmd)

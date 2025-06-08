@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <api_os.h>
+#include <api_sms.h>
 #include <api_event.h>
 #include <api_hal_uart.h>
 #include <api_hal_pm.h>
@@ -109,7 +110,12 @@ static void EventHandler(API_Event_t* pEvent)
         case API_EVENT_ID_SMS_RECEIVED:
             HandleSmsReceived(pEvent);
             break;
-
+    
+        case API_EVENT_ID_SMS_LIST_MESSAGE: {
+            SMS_Message_Info_t* msg = (SMS_Message_Info_t*)pEvent->pParam1;
+            HandleSmsListEvent(msg);
+            break;
+        }
         case API_EVENT_ID_GPS_UART_RECEIVED:
             if (g_ConfigStore.gps_logging)
                 LOGD("received GPS data, length:%d, data:\r\n%s",pEvent->param1,pEvent->pParam1);
