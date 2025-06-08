@@ -11,12 +11,38 @@
 #include "api_hal_uart.h"
 #include "gps_tracker.h"
 #include "config_store.h"
+#include "sms_service.h"
 #include "minmea.h"
 #include "utils.h"
 #include "debug.h"
 
-// Forward declaration for sending location SMS
-static void SendLocationSms(const char* phoneNumber);
+void SMSInit()
+{
+    if(!SMS_SetFormat(SMS_FORMAT_TEXT, SIM0))
+    {
+        LOGE("sms set format error");
+        return;
+    }
+
+    SMS_Parameter_t smsParam = {
+        .fo = 17 ,
+        .vp = 167,
+        .pid= 0  ,
+        .dcs= 8  ,  //0:English 7bit, 4:English 8 bit, 8:Unicode 2 Bytes
+    };
+    
+    if(!SMS_SetParameter(&smsParam, SIM0))
+    {
+        LOGE("sms set parameter error");
+        return;
+    }
+    
+    if(!SMS_SetNewMessageStorage(SMS_STORAGE_SIM_CARD))
+    {
+        LOGE("sms set message storage fail");
+        return;
+    }
+}
 
 // Helper to get last known position as Google Maps link
 static bool GetGoogleMapsLink(char* buf, size_t bufsize) {
@@ -44,25 +70,25 @@ void HandleSmsReceived(API_Event_t* pEvent) {
     char phoneNumber[32] = {0};
     // Parse phone number from header (assume header is ASCII and contains number)
     strncpy(phoneNumber, (const char*)header, sizeof(phoneNumber)-1);
-    LOGI( "SMS received from: %s, encodeType: %d, contentLength: %d", phoneNumber, encodeType, contentLength);
+    LOGE( "SMS received from: %s, encodeType: %d, contentLength: %d", phoneNumber, encodeType, contentLength);
     // Only handle ASCII for command parsing
     if (encodeType == SMS_ENCODE_TYPE_ASCII) {
         char cmd[64] = {0};
         strncpy(cmd, (const char*)content, contentLength < sizeof(cmd)-1 ? contentLength : sizeof(cmd)-1);
         trim_whitespace(cmd);
-        LOGI("SMS content: '%s'", cmd);
+        LOGE("SMS content: '%s'", cmd);
         if (str_case_cmp(cmd, "get location") == 0) {
             LOGI("Recognized 'get location' command from %s", phoneNumber);
             SendLocationSms(phoneNumber);
         } else {
-            LOGI("Unknown SMS command received: '%s'", cmd);
+            LOGE("Unknown SMS command received: '%s'", cmd);
         }
     } else {
-        LOGI("SMS received with unsupported encoding type: %d", encodeType);
+        LOGE("SMS received with unsupported encoding type: %d", encodeType);
     }
 }
 
-static void SendLocationSms(const char* phoneNumber) {
+void SendLocationSms(const char* phoneNumber) {
     char msg[128];
     if (GetGoogleMapsLink(msg, sizeof(msg))) {
         LOGI("Sending location SMS to %s: %s", phoneNumber, msg);

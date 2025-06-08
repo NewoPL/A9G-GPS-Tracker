@@ -239,7 +239,7 @@ void EventHandler(API_Event_t* pEvent)
             INITIALIZED_ON();
             break;
 
-            case API_EVENT_ID_SMS_RECEIVED:
+        case API_EVENT_ID_SMS_RECEIVED:
             HandleSmsReceived(pEvent);
             break;
 
@@ -435,8 +435,9 @@ void gps_MainTask(void *pData)
     ConfigStore_Init();
     FsInfoTest();    
     LED_init();
-    GPS_Init();    
     LED_cycle_start(gpsMainTaskHandle);
+    GPS_Init();
+    SMSInit();
 
     reportingTaskHandle = OS_CreateTask(
         gps_trackingTask, NULL, NULL,
