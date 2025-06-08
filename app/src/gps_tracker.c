@@ -38,10 +38,13 @@
 HANDLE gpsMainTaskHandle   = NULL;
 HANDLE reportingTaskHandle = NULL;
 
-Network_PDP_Context_t NetContext;
 uint8_t systemStatus = 0;
 uint8_t g_RSSI = 0;
 char    g_cellInfo[128] = "\0";
+// Provide last known position for SMS service
+float   g_last_latitude = 0.0f;
+float   g_last_longitude = 0.0f;
+
 
 SSL_Config_t SSLconfig = {
     .caCert          = NULL,
@@ -56,9 +59,40 @@ SSL_Config_t SSLconfig = {
     .entropyCustom   = "GPRS"
 };
 
-// Provide last known position for SMS service
-float g_last_latitude = 0.0f;
-float g_last_longitude = 0.0f;
+
+// --- APN Re-activation Workaround ---
+//
+// the firmware has a defect where re-activating the same APN after deactivation fails.
+// To work around this, we:
+//   1. Attempt to activate a dummy/incorrect APN first (NetContextArr[1]).
+//   2. Wait for a network deactivation event (which occurs because the dummy APN fails).
+//   3. Then activate the real APN (NetContextArr[0]).
+//
+// This workaround is managed by the apn_workaround_pending flag and the AttachActivate() function.
+// The dummy APN context is set once at system initialization. The real APN context is set as needed.
+// All logic for the workaround is centralized in AttachActivate; 
+// -----------------------------------
+
+Network_PDP_Context_t NetContextArr[2];      // Two-element array: [0]=real APN, [1]=dummy APN
+static bool apn_workaround_pending = false;  
+
+static void apnWorkaround_init(void) 
+{
+    // set Workaround state for APN re-activation
+    apn_workaround_pending = false;
+    // Dummy APN (index 1) context is set once at system init
+    memset(&NetContextArr[1], 0, sizeof(NetContextArr[1]));
+    strncpy(NetContextArr[1].apn, "dummy_apn", sizeof(NetContextArr[1].apn)-1);
+}
+
+// Helper to initialize the real APN context
+static void SetApnContext() {
+    // Real APN (index 0)
+    memset(&NetContextArr[0], 0, sizeof(NetContextArr[0]));
+    strncpy(NetContextArr[0].apn, g_ConfigStore.apn, sizeof(NetContextArr[0].apn)-1);
+    strncpy(NetContextArr[0].userName, g_ConfigStore.apn_user, sizeof(NetContextArr[0].userName)-1);
+    strncpy(NetContextArr[0].userPasswd, g_ConfigStore.apn_pass, sizeof(NetContextArr[0].userPasswd)-1);
+}
 
 bool AttachActivate()
 {
@@ -90,14 +124,22 @@ bool AttachActivate()
         if(!status)
         {
             LOGI("activating the network");
-            strncpy(NetContext.apn,      g_ConfigStore.apn,      sizeof(NetContext.apn));
-            strncpy(NetContext.userName, g_ConfigStore.apn_user, sizeof(NetContext.userName));
-            strncpy(NetContext.userPasswd, g_ConfigStore.apn_pass, sizeof(NetContext.userPasswd));
-            ret = Network_StartActive(NetContext);
-            if(!ret) {
-               LOGE("network activate failed");
-               return false;
+
+            // Implements the APN re-activation workaround:
+            // - If workaround is pending, activate the real APN (NetContextArr[0]) and clear the flag.
+            // - Otherwise, activate the dummy APN (NetContextArr[1]) and set the flag.
+            // This ensures the modem can recover from the re-activation defect.
+            if (apn_workaround_pending) {
+                SetApnContext();
+                ret = Network_StartActive(NetContextArr[0]); // real APN
+                apn_workaround_pending = false;
+            } else {
+                LOGW("Trying to activate dummy APN to workaround re-activation defect");
+                apn_workaround_pending = true;
+                ret = Network_StartActive(NetContextArr[1]); // dummy
             }
+            if (!ret)
+                LOGE("Failed to activate APN");
         }
     }
     return true;
@@ -172,57 +214,54 @@ void EventHandler(API_Event_t* pEvent)
     switch(pEvent->id)
     {
         case API_EVENT_ID_NO_SIMCARD:
-            GSM_STATUS_OFF();
+            GSM_ACTIVE_OFF();
             LOGE("no sim card %d !", pEvent->param1);
             break;
         case API_EVENT_ID_SIMCARD_DROP:
-            GSM_STATUS_OFF();
+            GSM_ACTIVE_OFF();
             LOGE("sim card %d drop !",pEvent->param1);
             break;
-        case API_EVENT_ID_NETWORK_REGISTER_SEARCHING:
-            LOGW("network register searching");
-            break;
         case API_EVENT_ID_NETWORK_REGISTER_DENIED:
+            GSM_REGISTERED_OFF();
             LOGE("network register denied");
-            GSM_STATUS_OFF();
             break;
         case API_EVENT_ID_NETWORK_REGISTER_NO:
+            GSM_REGISTERED_OFF();
             LOGE("network register no");
             break;
 
         case API_EVENT_ID_NETWORK_REGISTERED_HOME:
         case API_EVENT_ID_NETWORK_REGISTERED_ROAMING:
+            GSM_REGISTERED_ON();    
             LOGW("network register success");
             AttachActivate();
             break;
 
         case API_EVENT_ID_NETWORK_ATTACHED:
+            GSM_ACTIVE_OFF(); 
             LOGW("network attach success");
-            AttachActivate();
             break;
 
         case API_EVENT_ID_NETWORK_ACTIVATED:
-            GSM_STATUS_ON();
+            GSM_ACTIVE_ON();
             LOGW("network activate success");
             break;
 
         case API_EVENT_ID_NETWORK_ACTIVATE_FAILED:
-            GSM_STATUS_OFF();
             LOGE("network activate failed");
             break;
 
         case API_EVENT_ID_NETWORK_DEACTIVED:
-            GSM_STATUS_OFF(); 
+            GSM_ACTIVE_OFF(); 
             LOGE("network deactived");
             break;
 
         case API_EVENT_ID_NETWORK_ATTACH_FAILED:
-            GSM_STATUS_OFF();
+            GSM_ACTIVE_OFF(); 
             LOGE("network attach failed");
             break;
 
         case API_EVENT_ID_NETWORK_DETACHED:
-            GSM_STATUS_OFF();
             LOGE("network detached");
             break;
 
@@ -280,7 +319,7 @@ uint8_t responseBuffer[1024];
 
 void gps_trackingTask(void *pData)
 {
-    while (!IS_INITIALIZED() || !IS_GSM_STATUS_ON()) OS_Sleep(2000);
+    while (!IS_INITIALIZED() || !IS_GSM_ACTIVE()) OS_Sleep(2000);
 
     // open GPS hardware(UART2 open either)
     GPS_Open(NULL);
@@ -377,7 +416,7 @@ void gps_trackingTask(void *pData)
                      device_name, gpsInfo->rmc.valid, gps_timestamp, latitude, longitude, speed, bearing, altitude, accuracy, responseBuffer, percent);
             requestBuffer[sizeof(requestBuffer) - 1] = '\0';
 
-            if(IS_GSM_STATUS_ON())
+            if(IS_GSM_ACTIVE())
             {
                 const char* serverName = g_ConfigStore.server_addr;
                 const char* serverPort = g_ConfigStore.server_port;
@@ -396,8 +435,8 @@ void gps_trackingTask(void *pData)
             }
             else
             {
-                LOGE("No internet");
-            }
+                LOGE("No internet registered:%d, active:%d", 
+                     IS_GSM_REGISTERED(), IS_GSM_ACTIVE());           }
         }
         else
         {
@@ -432,6 +471,7 @@ void gps_MainTask(void *pData)
     UART_Init(UART1, config);
     
     UART_Printf("Initialization ...\r\n");
+    apnWorkaround_init();
     ConfigStore_Init();
     FsInfoTest();    
     LED_init();
