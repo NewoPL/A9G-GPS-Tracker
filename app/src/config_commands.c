@@ -30,6 +30,8 @@ void HandleNetworkActivateCommand(char*);
 void HandleNetworkStatusCommand(char*);
 void HandleLocationCommand(char*);
 void HandleSmsCommand(char*);
+void HandleSmsLsCommand(char*);
+void HandleSmsRmCommand(char*);
 
 struct uart_cmd_entry {
     const char* cmd;
@@ -46,13 +48,13 @@ static struct uart_cmd_entry uart_cmd_table[] = {
     {"ls",           2, HandleLsCommand,              "ls [path]",           "List files in specified folder (default: /)"},
     {"rm",           2, HandleRemoveFileCommand,      "rm <file>",           "Remove file at specified path"},
     {"tail",         4, HandleTailCommand,            "tail <file> [bytes]", "Print last [bytes] of file (default: 500 bytes)"},
-    {"restart",      7, HandleRestartCommand,         "restart",             "Restart the system immediately"},
-    {"netactivate", 11, HandleNetworkActivateCommand, "netactivate",         "Activate (attach and activate) the network"},
-    {"netstatus",    9, HandleNetworkStatusCommand,   "netstatus",           "Print network status"},
-    {"location",     8, HandleLocationCommand,        "location",            "Show the last known GPS position"},
-    {"sms ls",       6, HandleSmsCommand,             "sms ls <all|read|unread>", "list SMS messages ()"},
-    {"sms rm",       6, HandleSmsCommand,             "sms rm <index|all>",  "remove SMS message (rm <index>) or remove all messages (rm all)"},
+    {"net activate",12, HandleNetworkActivateCommand, "net activate",        "Activate (attach and activate) the network"},
+    {"net status",  10, HandleNetworkStatusCommand,   "net status",          "Print network status"},
     {"sms",          3, HandleSmsCommand,             "sms",                 "Show SMS storage info (default)"},
+    {"sms ls",       6, HandleSmsLsCommand,           "sms ls <all|read|unread>", "list SMS messages ()"},
+    {"sms rm",       6, HandleSmsRmCommand,           "sms rm <index|all>",  "remove SMS message (rm <index>) or remove all messages (rm all)"},
+    {"location",     8, HandleLocationCommand,        "location",            "Show the last known GPS position"},
+    {"restart",      7, HandleRestartCommand,         "restart",             "Restart the system immediately"},
 };
 
 
@@ -232,7 +234,7 @@ void HandleTailCommand(char* args)
         remaining -= n;
     }
     UART_Printf("\r\n");
-    API_FS_Close(fd);
+    API_FS_Close(fd);u
 }
 
 void HandleLocationCommand(char* param)
@@ -245,12 +247,12 @@ void HandleLocationCommand(char* param)
         return;
     }
 
-    if (!gpsInfo->rmc.valid) {
+    UART_Printf("Satellites visible: %d, tracked: %d\r\n", 
+                gpsInfo->gsv[0].total_sats, 
+                gpsInfo->gga.satellites_tracked);    
+    
+    if (!gpsInfo->rmc.valid)
         UART_Printf("No valid GPS fix available.\r\n");
-        UART_Printf("Satellites visible: %d, tracked: %d\r\n", 
-                    gpsInfo->gsv[0].total_sats, 
-                    gpsInfo->gga.satellites_tracked);
-    }
 
     // Convert NMEA coordinates (DDMM.MMMM format) to decimal degrees
     float latitude = minmea_tocoord(&gpsInfo->rmc.latitude);
@@ -267,6 +269,8 @@ void HandleLocationCommand(char* param)
     UART_Printf("  Course:      %.1f°\r\n", minmea_tofloat(&gpsInfo->rmc.course));
     UART_Printf("  Fix quality: %d\r\n", gpsInfo->gga.fix_quality);
     UART_Printf("  HDOP: %.1f\r\n", minmea_tofloat(&gpsInfo->gsa[0].hdop));
+
+    return;
 }
 
 void HandleNetworkStatusCommand(char* param)
@@ -320,71 +324,74 @@ void HandleHelpCommand(char* args)
     for (unsigned i = 0; i < sizeof(uart_cmd_table)/sizeof(uart_cmd_table[0]); ++i) {
         UART_Printf("  %-24s- %s\r\n", uart_cmd_table[i].syntax, uart_cmd_table[i].help);
     }
-    UART_Printf("\r\n  <param> is one of:\r\n");
+    UART_Printf("\r\n<param> is one of:\r\n  ");
     for (size_t i = 0; i < g_config_map_size; ++i) {
-        UART_Printf("    %s\r\n", g_config_map[i].param_name);
+        UART_Printf("%s, ", g_config_map[i].param_name);
     }
+    UART_Printf("\r\n");
 }
 
 void HandleSmsCommand(char* param)
 {
     param = trim_whitespace(param);
-    if (*param == '\0') {
-        // Print all SMS storage info
-        SMS_Storage_Info_t info;
-        if (!SMS_GetStorageInfo(&info, SMS_STORAGE_SIM_CARD)) {
-            UART_Printf("Failed to get SMS storage info.\r\n");
-            return;
-        }
-        UART_Printf("SMS Storage Info (SIM):\r\n");
-        UART_Printf("  Used: %d\r\n", info.used);
-        UART_Printf("  Total: %d\r\n", info.total);
-        UART_Printf("  Unread: %d\r\n", info.unReadRecords);
-        UART_Printf("  Read: %d\r\n", info.readRecords);
-        UART_Printf("  Sent: %d\r\n", info.sentRecords);
-        UART_Printf("  Unsent: %d\r\n", info.unsentRecords);
-        UART_Printf("  Unknown: %d\r\n", info.unknownRecords);
-        UART_Printf("  Storage ID: %d\r\n", info.storageId);
+    if (*param != '\0') {
+        UART_Printf("Unknown sms command parameter\r\n");
         return;
-    } else if (strncmp(param, "ls", 2) == 0) {
-        // List all SMS messages, or filtered by read/unread
-        param += 2;
-        param = trim_whitespace(param);
-        SMS_Status_t status = SMS_STATUS_ALL;
-        if (strncmp(param, "read", 4) == 0) {
-            status = SMS_STATUS_READ;
-        } else if (strncmp(param, "unread", 6) == 0) {
-            status = SMS_STATUS_UNREAD;
-        } else if (strncmp(param, "all", 3) == 0 || *param == '\0') {
-            status = SMS_STATUS_ALL;
-        } else if (*param != '\0') {
-            UART_Printf("Unknown sms ls filter. Use 'sms ls', 'sms ls all', 'sms ls read', or 'sms ls unread'\r\n");
-            return;
-        }
-        if (!SMS_ListMessageRequst(status, SMS_STORAGE_SIM_CARD)) {
-            UART_Printf("Failed to request SMS list.\r\n");
-            return;
-        }
-    } else if (strncmp(param, "rm", 2) == 0) {
-        // Remove SMS message by index
-        param += 2;
-        param = trim_whitespace(param);
-        if (*param == '\0') {
-            UART_Printf("Usage: sms rm <index>\r\n");
-            return;
-        }
-        int idx = atoi(param);
-        if (idx < 0) {
-            UART_Printf("Invalid index.\r\n");
-            return;
-        }
-        if (SMS_DeleteMessage(idx, SMS_STATUS_ALL, SMS_STORAGE_SIM_CARD)) {
-            UART_Printf("Deleted SMS at index %d\r\n", idx);
-        } else {
-            UART_Printf("Failed to delete SMS at index %d\r\n", idx);
-        }
+    }
+    // Print all SMS storage info
+    SMS_Storage_Info_t info;
+    if (!SMS_GetStorageInfo(&info, SMS_STORAGE_SIM_CARD)) {
+        UART_Printf("Failed to get SMS storage info.\r\n");
+        return;
+    }
+    UART_Printf("SMS Storage Info (SIM):\r\n");
+    UART_Printf("  Used: %d\r\n", info.used);
+    UART_Printf("  Total: %d\r\n", info.total);
+    UART_Printf("  Unread: %d\r\n", info.unReadRecords);
+    UART_Printf("  Read: %d\r\n", info.readRecords);
+    UART_Printf("  Sent: %d\r\n", info.sentRecords);
+    UART_Printf("  Unsent: %d\r\n", info.unsentRecords);
+    UART_Printf("  Unknown: %d\r\n", info.unknownRecords);
+    UART_Printf("  Storage ID: %d\r\n", info.storageId);
+    return;
+}
+
+void HandleSmsLsCommand(char* param)
+{
+    SMS_Status_t status;
+    param = trim_whitespace(param);
+    if ((*param == '\0') || (strncmp(param, "all", 3) == 0)) {
+        status = SMS_STATUS_ALL;
+    }  else if (strncmp(param, "read", 4) == 0) {
+        status = SMS_STATUS_READ;
+    } else if (strncmp(param, "unread", 6) == 0) {
+        status = SMS_STATUS_UNREAD;
     } else {
-        UART_Printf("Unknown sms subcommand. Use 'sms', 'sms ls', or 'sms rm <index>'\r\n");
+        UART_Printf("Unknown sms ls parameter. Use 'all', 'read', or 'unread'\r\n");
+        return;
+    }
+    if (!SMS_ListMessageRequst(status, SMS_STORAGE_SIM_CARD)) {
+        UART_Printf("Failed to request SMS list\r\n");
+    }
+    return;
+}
+
+void HandleSmsRmCommand(char* param)
+{
+    param = trim_whitespace(param);
+    if (*param != '\0') {
+        UART_Printf("incorrect parameter\r\n");
+        return;
+    }
+    int idx = atoi(param);
+    if (idx < 0) {
+        UART_Printf("Invalid index.\r\n");
+        return;
+    }
+    if (SMS_DeleteMessage(idx, SMS_STATUS_ALL, SMS_STORAGE_SIM_CARD)) {
+        UART_Printf("Deleted SMS at index %d\r\n", idx);
+    } else {
+        UART_Printf("Failed to delete SMS at index %d\r\n", idx);
     }
 }
 
