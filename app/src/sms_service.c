@@ -63,21 +63,35 @@ void HandleSmsReceived(API_Event_t* pEvent)
 {
     SMS_Encode_Type_t encodeType = pEvent->param1;
     const char* headerStr = pEvent->pParam1;
-    const char* contentStr = pEvent->pParam2;
+    const char* content = pEvent->pParam2; 
     uint32_t contentLength = pEvent->param2;    
 
     char cmd[SMS_BODY_MAX_LEN] = {0};
-    strncpy(cmd, (const char*)contentStr, contentLength < sizeof(cmd)-1 ? contentLength : sizeof(cmd)-1);
-    trim_whitespace(cmd);
-    
-    LOGI("SMS received header: %s, encodeType: %d, contentLength: %d", headerStr, encodeType, contentLength);
-    LOGI("SMS content: '%s'", cmd);
 
-    // Only handle ASCII for command parsing
-    if (encodeType != SMS_ENCODE_TYPE_ASCII) {
+    // Process content based on encoding type
+    if (encodeType == SMS_ENCODE_TYPE_ASCII) {
+        // Direct copy for ASCII encoding
+        strncpy(cmd, (const char*)content, contentLength < sizeof(cmd)-1 ? contentLength : sizeof(cmd)-1);
+    } 
+    else if (encodeType == SMS_ENCODE_TYPE_UNICODE) {
+        // Extract text from Unicode (UCS-2) encoding
+        // In Unicode, each character is 2 bytes, with ASCII characters having 0x00 as the high byte
+        uint16_t cmdLen = 0;
+        for (uint16_t i = 0; i < contentLength && cmdLen < sizeof(cmd)-1; i += 2) {
+            // Check if it's ASCII character in Unicode format (high byte is 0)
+            if (i+1 < contentLength && content[i] == 0) {
+                cmd[cmdLen++] = content[i+1];
+            }
+        }
+    }
+    else {
         LOGE("SMS received with unsupported encoding type: %d", encodeType);
         return;
     }
+    
+    trim_whitespace(cmd);
+    LOGI("SMS received header: %s, encodeType: %d, contentLength: %d", headerStr, encodeType, contentLength);
+    LOGI("SMS content (processed): '%s'", cmd);
  
     // Parse phone number from header - it's enclosed in quotes and followed by a comma
     // Format example: "+1234567890","2023/06/08,11:22:33+00"
@@ -101,8 +115,9 @@ void HandleSmsReceived(API_Event_t* pEvent)
             break;
         }
         
-    // Only collect characters if we're inside quotes
+        // Only collect characters if we're inside quotes
         if (insideQuotes) {
+            // any digit is allowed
             // '+' is only allowed as the first character of the phone number
             if (isdigit(c) || (c == '+' && phoneIdx == 0)) {
                 phoneNumber[phoneIdx++] = c;
