@@ -17,12 +17,6 @@ static GPIO_config_t gpioLedGsm = {
 
 void LED_Blink(void* param);
 
-void LED_init()
-{  
-    GPIO_Init(gpioLedGps);
-    GPIO_Init(gpioLedGsm);
-}
-
 void LED_BlinkingTimer(HANDLE taskHandle)
 {  
     OS_StartCallbackTimer(taskHandle, 500, LED_Blink, (void*)taskHandle);
@@ -56,5 +50,12 @@ void LED_Blink(void* param)
         count = (count + 1) % 2;
     }
 
+    LED_BlinkingTimer(taskHandle);
+}
+
+void LED_init(HANDLE taskHandle)
+{  
+    GPIO_Init(gpioLedGps);
+    GPIO_Init(gpioLedGsm);
     LED_BlinkingTimer(taskHandle);
 }

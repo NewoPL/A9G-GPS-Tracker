@@ -62,13 +62,13 @@ static void EventHandler(API_Event_t* pEvent)
         case API_EVENT_ID_NETWORK_REGISTERED_ROAMING:
             GSM_REGISTERED_ON();    
             LOGW("network register success");
-            gsm_AttachActivate();
+            NetworkAttachActivate();
             break;
 
         case API_EVENT_ID_NETWORK_ATTACHED:
             GSM_ACTIVE_OFF(); 
             LOGW("network attach success");
-            gsm_AttachActivate();            
+            NetworkAttachActivate();            
             break;
 
         case API_EVENT_ID_NETWORK_ACTIVATED:
@@ -99,7 +99,7 @@ static void EventHandler(API_Event_t* pEvent)
             break;
 
         case API_EVENT_ID_NETWORK_CELL_INFO:
-            networkCellInfoCallback((Network_Location_t*)pEvent->pParam1, pEvent->param1);
+            NetworkCellInfoCallback((Network_Location_t*)pEvent->pParam1, pEvent->param1);
             break;
 
         case API_EVENT_ID_SYSTEM_READY:
@@ -163,15 +163,13 @@ void app_MainTask(void *pData)
 
     PM_PowerEnable(POWER_TYPE_VPAD, true);
     UART_Init(UART1, config);
-    
+
     UART_Printf("Initialization ...\r\n");
+    NetworkInit(appMainTaskHandle);
+    LED_init(appMainTaskHandle);
     TIME_SetIsAutoUpdateRtcTime(true);
-    apnWorkaround_init();
     ConfigStore_Init();
     FsInfoTest();    
-    LED_init();
-    LED_BlinkingTimer(appMainTaskHandle);
-    networkCellInfoTimer(appMainTaskHandle);
     GPS_Init();
     SMSInit();
 

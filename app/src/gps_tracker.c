@@ -67,7 +67,7 @@ void gps_trackerTask(void *pData)
     {
         GPS_Info_t* gpsInfo = Gps_GetInfo();
         uint32_t    loop_start = time(NULL);
-        if(IS_GPS_STATUS_ON() && (IS_GPS_FIX()))
+        if(IS_GPS_STATUS_ON()) // && (IS_GPS_FIX()))
         {
             time_t gps_timestamp = mk_time(&gpsInfo->rmc.date, &gpsInfo->rmc.time);
             

@@ -11,7 +11,12 @@
 #include "network.h"
 #include "debug.h"
 
-char g_cellInfo[128]  = "\0";
+char                         g_cellInfo[128] = "\0";
+static Network_Status_t      g_NetworkStatus = 0;
+static Network_PDP_Context_t NetContextArr[2]; // Two-element array: [0]=real APN, [1]=dummy APN
+static bool apn_workaround_pending = false;  
+
+static void Network_SetCellInfoTimer(HANDLE);
 
 void NetworkCellInfoGet(void* param)
 {
@@ -27,15 +32,10 @@ void NetworkCellInfoGet(void* param)
     }
 
     HANDLE taskHandle = (HANDLE)param;
-    networkCellInfoTimer(taskHandle);
+    Network_SetCellInfoTimer(taskHandle);
 }
 
-void networkCellInfoTimer(HANDLE taskHandle)
-{  
-    OS_StartCallbackTimer(taskHandle, 15000, NetworkCellInfoGet, (void*)taskHandle);
-}
-
-void networkCellInfoCallback(Network_Location_t* loc, int number)
+void NetworkCellInfoCallback(Network_Location_t* loc, int number)
 {
     g_cellInfo[0] = '\0';
     if (number <= 0) return;
@@ -43,31 +43,64 @@ void networkCellInfoCallback(Network_Location_t* loc, int number)
              loc->sMcc[0], loc->sMcc[1], loc->sMcc[2], loc->sMnc[0], loc->sMnc[1], loc->sMnc[2], loc->sLac, loc->sCellID, loc->iRxLev);
 }
 
-// --- APN Re-activation Workaround ---
-//
-// the firmware has a defect where re-activating the same APN after deactivation fails.
-// To work around this, we:
-//   1. Attempt to activate a dummy/incorrect APN first (NetContextArr[1]).
-//   2. Wait for a network deactivation event (which occurs because the dummy APN fails).
-//   3. Then activate the real APN (NetContextArr[0]).
-//
-// This workaround is managed by the apn_workaround_pending flag and the AttachActivate() function.
-// The dummy APN context is set once at system initialization. The real APN context is set as needed.
-// All logic for the workaround is centralized in AttachActivate; 
+static void Network_SetCellInfoTimer(HANDLE taskHandle)
+{  
+    OS_StartCallbackTimer(taskHandle, 15000, NetworkCellInfoGet, (void*)taskHandle);
+}
 
-
-// Two-element array: [0]=real APN, [1]=dummy APN
-static Network_PDP_Context_t NetContextArr[2];
-static bool apn_workaround_pending = false;  
-
-void apnWorkaround_init(void) 
+// OS Calls this function whenever the network state changes
+void NetworkUpdateStatus(Network_Status_t status)
 {
-    // set Workaround state for APN re-activation
+    const char* status_str = "UNKNOWN";
+    switch (status) {
+        case NETWORK_STATUS_OFFLINE:        status_str = "OFFLINE"; break;
+        case NETWORK_STATUS_REGISTERING:    status_str = "REGISTERING"; break;
+        case NETWORK_STATUS_REGISTERED:     status_str = "REGISTERED"; break;
+        case NETWORK_STATUS_DETACHED:       status_str = "DETACHED"; break;
+        case NETWORK_STATUS_ATTACHING:      status_str = "ATTACHING"; break;
+        case NETWORK_STATUS_ATTACHED:       status_str = "ATTACHED"; break;
+        case NETWORK_STATUS_DEACTIVED:      status_str = "DEACTIVED"; break;
+        case NETWORK_STATUS_ACTIVATING:     status_str = "ACTIVATING"; break;
+        case NETWORK_STATUS_ACTIVATED:      status_str = "ACTIVATED"; break;
+        case NETWORK_STATUS_ATTACH_FAILED:  status_str = "ATTACH_FAILED"; break;
+        case NETWORK_STATUS_ACTIVATE_FAILED:status_str = "ACTIVATE_FAILED"; break;
+        default:                            status_str = "INVALID"; break;
+    }
+    LOGI("[Network] UpdateStatus called with status=%d (%s)", status, status_str);
+    g_NetworkStatus = status;
+}
+
+Network_Status_t NetworkGetStatus()
+{
+    return g_NetworkStatus;
+}
+
+void NetworkInit(HANDLE taskHandle)
+{
+    Network_SetStatusChangedCallback(NetworkUpdateStatus);
+
+    // APN Re-activation Workaround
+    //
+    // the firmware has a defect where re-activating the same APN after deactivation fails.
+    // To work around this, we:
+    //   1. Attempt to activate a dummy/incorrect APN first (NetContextArr[1]).
+    //   2. Wait for a network deactivation event (which occurs because the dummy APN fails).
+    //   3. Then activate the real APN (NetContextArr[0]).
+    //
+    // This workaround is managed by the apn_workaround_pending flag and the AttachActivate() function.
+    // The dummy APN context is set once at system initialization. The real APN context is set as needed.
+    // All logic for the workaround is centralized in AttachActivate; 
     apn_workaround_pending = false;
+
     // Dummy APN (index 1) context is set once at system init
     memset(&NetContextArr[1], 0, sizeof(NetContextArr[1]));
     strncpy(NetContextArr[1].apn, "dummy_apn", sizeof(NetContextArr[1].apn)-1);
+
+    Network_SetCellInfoTimer(taskHandle);
+
+    return;
 }
+
 
 // Helper to initialize the real APN context
 static void SetApnContext() {
@@ -78,7 +111,7 @@ static void SetApnContext() {
     strncpy(NetContextArr[0].userPasswd, g_ConfigStore.apn_pass, sizeof(NetContextArr[0].userPasswd)-1);
 }
 
-bool gsm_AttachActivate()
+bool NetworkAttachActivate()
 {
     uint8_t status;
     bool ret = Network_GetAttachStatus(&status);
@@ -116,10 +149,10 @@ bool gsm_AttachActivate()
             if (!apn_workaround_pending) {
                 SetApnContext();
                 ret = Network_StartActive(NetContextArr[0]); // real APN
-                apn_workaround_pending = false;
+                apn_workaround_pending = true;
             } else {
                 LOGW("Trying to activate dummy APN to workaround re-activation defect");
-                apn_workaround_pending = true;
+                apn_workaround_pending = false;
                 ret = Network_StartActive(NetContextArr[1]); // dummy
             }
             if (!ret)

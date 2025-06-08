@@ -12,26 +12,14 @@
  */
 extern char g_cellInfo[];
 
-void networkCellInfoTimer(HANDLE taskHandle);
-
 /**
- * @brief Callback to process network cell information and update the global cell info string.
+ * @brief Setups capturing network state.
  * 
- * This function formats the provided network location data into a string representation
- * and stores it in the global variable `g_cellInfo`.
- * 
- * @param loc Pointer to a Network_Location_t structure containing cell information.
- * @param number The number of cells to process (used for validation).
+ * This function should be called during system initialization to set up the network status callback.
+ * It registers a callback function that will be called whenever the network status changes.
+ * It sets up the dummy APN context and initializes the workaround state.
  */
-void networkCellInfoCallback(Network_Location_t* loc, int number);
-
-/**
- * @brief Initializes the APN re-activation workaround.
- *
- * This function sets up the dummy APN context and initializes the workaround state.
- * It should be called once during system initialization. 
- */
-void apnWorkaround_init(void);
+void NetworkInit(HANDLE taskHandle);
 
 /**
  * @brief Attach and activate the GSM network.
@@ -41,7 +29,23 @@ void apnWorkaround_init(void);
  * It handles the APN re-activation workaround by toggling between a dummy APN and the real APN.
  * @return true if the operation was successful, false otherwise.
  */
-bool gsm_AttachActivate(void);
+bool NetworkAttachActivate(void);
 
+/**
+ * @brief Gets the current network status.
+ * 
+ * This function retrieves the current network status as defined by the Network_Status_t enum.
+ * @return The current network status.
+ */
+Network_Status_t NetworkGetStatus(void);
+
+/**
+ * @brief Callback function to handle network cell information updates.
+ * 
+ * This function should be called by the event handler functionfor each
+ * API_EVENT_ID_NETWORK_CELL_INFO event. It formats the cell information into a string
+ * and stores it in the global `g_cellInfo` variable.
+ */
+void NetworkCellInfoCallback(Network_Location_t* loc, int number);
 
 #endif

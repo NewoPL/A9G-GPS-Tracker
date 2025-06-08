@@ -50,7 +50,9 @@ static struct uart_cmd_entry uart_cmd_table[] = {
     {"netactivate", 11, HandleNetworkActivateCommand, "netactivate",         "Activate (attach and activate) the network"},
     {"netstatus",    9, HandleNetworkStatusCommand,   "netstatus",           "Print network status"},
     {"location",     8, HandleLocationCommand,        "location",            "Show the last known GPS position"},
-    {"sms",          3, HandleSmsCommand,             "sms ls [all|read|unread]|rm <index>]", "Show SMS storage info (default), list messages (ls [all|read|unread]), or remove message (rm <index>)"},
+    {"sms ls",       6, HandleSmsCommand,             "sms ls <all|read|unread>", "list SMS messages ()"},
+    {"sms rm",       6, HandleSmsCommand,             "sms rm <index|all>",  "remove SMS message (rm <index>) or remove all messages (rm all)"},
+    {"sms",          3, HandleSmsCommand,             "sms",                 "Show SMS storage info (default)"},
 };
 
 
@@ -299,7 +301,7 @@ void HandleNetworkStatusCommand(char* param)
 
 void HandleNetworkActivateCommand(char* param)
 {
-    if (gsm_AttachActivate()) {
+    if (NetworkAttachActivate()) {
         UART_Printf("Network activated.\r\n");
     } else {
         UART_Printf("Network activation failed.\r\n");

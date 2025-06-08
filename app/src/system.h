@@ -26,7 +26,7 @@ typedef enum {
 #define GPS_FIX_OFF()      (systemStatus &= ~STATUS_GPS_FIX)
 #define IS_GPS_FIX()       (systemStatus & STATUS_GPS_FIX)
 
-// GSM
+// GSM Active
 #define GSM_ACTIVE_ON()    (systemStatus |= STATUS_GSM_ACTIVE)
 #define GSM_ACTIVE_OFF()   (systemStatus &= ~STATUS_GSM_ACTIVE)
 #define IS_GSM_ACTIVE()    (systemStatus & STATUS_GSM_ACTIVE)
