@@ -4,11 +4,14 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "api_os.h"
-#include "api_debug.h"
-#include "api_event.h"
-#include "api_sms.h"
-#include "api_hal_uart.h"
+#include <api_os.h>
+#include <api_debug.h>
+#include <api_event.h>
+#include <api_sms.h>
+#include <api_hal_uart.h>
+
+#include "system.h"
+#include "gps_parse.h"
 #include "gps_tracker.h"
 #include "config_store.h"
 #include "sms_service.h"
@@ -47,46 +50,83 @@ void SMSInit()
 // Helper to get last known position as Google Maps link
 static bool GetGoogleMapsLink(char* buf, size_t bufsize)
 {
-    // You may want to use actual last known position from your GPS logic
-    // For now, use global config or a stub
-    float lat = 0.0f, lon = 0.0f;
-    // TODO: Replace with actual retrieval of last known position
-    extern float g_last_latitude;
-    extern float g_last_longitude;
-    lat = g_last_latitude;
-    lon = g_last_longitude;
-    if (lat == 0.0f && lon == 0.0f) {
-        snprintf(buf, bufsize, "Location unknown");
+    if (g_last_latitude == 0.0f && g_last_longitude == 0.0f)
         return false;
-    }
-    snprintf(buf, bufsize, "https://maps.google.com/?q=%f,%f", lat, lon);
+    
+    // Format with proper precision for Google Maps link
+    snprintf(buf, bufsize, "https://maps.google.com/?q=%.6f,%.6f",
+             g_last_latitude, g_last_longitude);
     return true;
 }
 
 void HandleSmsReceived(API_Event_t* pEvent)
 {
     SMS_Encode_Type_t encodeType = pEvent->param1;
-    uint32_t contentLength = pEvent->param2;
-    uint8_t* header = pEvent->pParam1;
-    uint8_t* content = pEvent->pParam2;
-    char phoneNumber[32] = {0};
-    // Parse phone number from header (assume header is ASCII and contains number)
-    strncpy(phoneNumber, (const char*)header, sizeof(phoneNumber)-1);
-    LOGE( "SMS received from: %s, encodeType: %d, contentLength: %d", phoneNumber, encodeType, contentLength);
+    const char* headerStr = pEvent->pParam1;
+    const char* contentStr = pEvent->pParam2;
+    uint32_t contentLength = pEvent->param2;    
+
+    char cmd[SMS_BODY_MAX_LEN] = {0};
+    strncpy(cmd, (const char*)contentStr, contentLength < sizeof(cmd)-1 ? contentLength : sizeof(cmd)-1);
+    trim_whitespace(cmd);
+    
+    LOGI("SMS received header: %s, encodeType: %d, contentLength: %d", headerStr, encodeType, contentLength);
+    LOGE("SMS content: '%s'", cmd);
+
     // Only handle ASCII for command parsing
-    if (encodeType == SMS_ENCODE_TYPE_ASCII) {
-        char cmd[64] = {0};
-        strncpy(cmd, (const char*)content, contentLength < sizeof(cmd)-1 ? contentLength : sizeof(cmd)-1);
-        trim_whitespace(cmd);
-        LOGE("SMS content: '%s'", cmd);
-        if (str_case_cmp(cmd, "get location") == 0) {
-            LOGI("Recognized 'get location' command from %s", phoneNumber);
-            SendLocationSms(phoneNumber);
-        } else {
-            LOGE("Unknown SMS command received: '%s'", cmd);
-        }
-    } else {
+    if (encodeType != SMS_ENCODE_TYPE_ASCII) {
         LOGE("SMS received with unsupported encoding type: %d", encodeType);
+        return;
+    }
+ 
+    // Parse phone number from header - it's enclosed in quotes and followed by a comma
+    // Format example: "+1234567890","2023/06/08,11:22:33+00"
+
+    // Direct character-by-character parsing approach
+    int phoneIdx = 0;
+    bool insideQuotes = false;
+    char phoneNumber[SMS_PHONE_NUMBER_MAX_LEN+1] = {0};
+
+    for (int i = 0; headerStr[i] != '\0' && phoneIdx < sizeof(phoneNumber) - 1; i++) {
+        char c = headerStr[i];
+        
+        // Start collecting after finding the opening quote
+        if (!insideQuotes && c == '\"') {
+            insideQuotes = true;
+            continue;
+        }
+        
+        // Stop when we hit closing quote
+        if (insideQuotes && c == '\"') {
+            break;
+        }
+        
+    // Only collect characters if we're inside quotes
+        if (insideQuotes) {
+            // '+' is only allowed as the first character of the phone number
+            if (isdigit(c) || (c == '+' && phoneIdx == 0)) {
+                phoneNumber[phoneIdx++] = c;
+            } else {
+                LOGE("Unexpected character in phone number: '%c'", c);
+                return;
+            }
+        }
+    }
+    
+    phoneNumber[phoneIdx] = '\0'; // Ensure null termination
+
+    // return phone number is empty
+    if (phoneNumber[0] == '\0') {
+        LOGE("Return phone number is empty");
+        return;
+    }
+
+    // parse command from SMS content
+    if (str_case_cmp(cmd, "get location") == 0) {
+        LOGI("Recognized 'get location' command from %s", phoneNumber);
+        SendLocationSms(phoneNumber);
+    } else {
+        LOGE("Unknown SMS command received: %s", cmd);
     }
 }
 
