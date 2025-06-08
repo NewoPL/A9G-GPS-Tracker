@@ -5,6 +5,6 @@
 #define GSM_STATUS_LED   GPIO_PIN28
 
 void LED_init();
-void LED_cycle_start(HANDLE taskHandle);
+void LED_BlinkingTimer(HANDLE taskHandle);
 
 #endif

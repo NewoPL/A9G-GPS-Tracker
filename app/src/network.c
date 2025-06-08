@@ -259,18 +259,7 @@ int Http_Post(SSL_Config_t *sslConfig,
 
 char g_cellInfo[128]  = "\0";
 
-void processNetworkCellInfo(Network_Location_t* loc, int number)
-{
-    g_cellInfo[0] = '\0';
-    if (number <= 0) return;
-    snprintf(g_cellInfo,  sizeof(g_cellInfo), "%u%u%u,%u%u%u,%u,%u,%d",
-             loc->sMcc[0], loc->sMcc[1], loc->sMcc[2], loc->sMnc[0], loc->sMnc[1], loc->sMnc[2], loc->sLac, loc->sCellID, loc->iRxLev);
-}
-
-// Timer handle for periodic cell info refresh
-static HANDLE networkInfoTimerHandle = NULL;
-
-void network_info(void* param)
+void NetworkCellInfoGet(void* param)
 {
     if (param == NULL) return;
 
@@ -282,10 +271,18 @@ void network_info(void* param)
     }
 
     HANDLE taskHandle = (HANDLE)param;
-    network_info_start(taskHandle);
+    networkCellInfoTimer(taskHandle);
 }
 
-void network_info_start(HANDLE taskHandle)
+void networkCellInfoTimer(HANDLE taskHandle)
 {  
-    OS_StartCallbackTimer(taskHandle, 15000, network_info, (void*)taskHandle);
+    OS_StartCallbackTimer(taskHandle, 15000, NetworkCellInfoGet, (void*)taskHandle);
+}
+
+void networkCellInfoCallback(Network_Location_t* loc, int number)
+{
+    g_cellInfo[0] = '\0';
+    if (number <= 0) return;
+    snprintf(g_cellInfo,  sizeof(g_cellInfo), "%u%u%u,%u%u%u,%u,%u,%d",
+             loc->sMcc[0], loc->sMcc[1], loc->sMcc[2], loc->sMnc[0], loc->sMnc[1], loc->sMnc[2], loc->sLac, loc->sCellID, loc->iRxLev);
 }

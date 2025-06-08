@@ -99,7 +99,7 @@ bool gsm_AttachActivate()
             // - If workaround is pending, activate the real APN (NetContextArr[0]) and clear the flag.
             // - Otherwise, activate the dummy APN (NetContextArr[1]) and set the flag.
             // This ensures the modem can recover from the re-activation defect.
-            if (apn_workaround_pending) {
+            if (!apn_workaround_pending) {
                 SetApnContext();
                 ret = Network_StartActive(NetContextArr[0]); // real APN
                 apn_workaround_pending = false;

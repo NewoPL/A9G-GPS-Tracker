@@ -23,7 +23,7 @@ void LED_init()
     GPIO_Init(gpioLedGsm);
 }
 
-void LED_cycle_start(HANDLE taskHandle)
+void LED_BlinkingTimer(HANDLE taskHandle)
 {  
     OS_StartCallbackTimer(taskHandle, 500, LED_Blink, (void*)taskHandle);
 }
@@ -48,7 +48,7 @@ void LED_Blink(void* param)
 
     if (IS_INITIALIZED()) {
         handle_led_blink(IS_GPS_FIX(), count, GPS_STATUS_LED);
-        handle_led_blink(IS_GSM_STATUS_ON(), count, GSM_STATUS_LED);
+        handle_led_blink(IS_GSM_ACTIVE(), count, GSM_STATUS_LED);
         count = (count + 1) % 5;
     } else {
         GPIO_Set(GPS_STATUS_LED, GPIO_LEVEL_LOW);
@@ -56,5 +56,5 @@ void LED_Blink(void* param)
         count = (count + 1) % 2;
     }
 
-    LED_cycle_start(taskHandle);
+    LED_BlinkingTimer(taskHandle);
 }
