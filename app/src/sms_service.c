@@ -67,7 +67,7 @@ void HandleSmsReceived(API_Event_t* pEvent)
     uint32_t contentLength = pEvent->param2;    
 
     char cmd[SMS_BODY_MAX_LEN] = {0};
-    
+
     // Process content based on encoding type
     if (encodeType == SMS_ENCODE_TYPE_ASCII) {
         // Direct copy for ASCII encoding

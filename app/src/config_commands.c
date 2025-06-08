@@ -254,26 +254,17 @@ void HandleLocationCommand(char* param)
     float latitude = minmea_tocoord(&gpsInfo->rmc.latitude);
     float longitude = minmea_tocoord(&gpsInfo->rmc.longitude);
     
-    // Get date and time information
-    char dateTime[32];
-    snprintf(dateTime, sizeof(dateTime), "%02d.%02d.%02d %02d:%02d:%02d UTC", 
-             gpsInfo->rmc.date.year,
-             gpsInfo->rmc.date.month, 
-             gpsInfo->rmc.date.day,
-             gpsInfo->rmc.time.hours,
-             gpsInfo->rmc.time.minutes, 
-             gpsInfo->rmc.time.seconds);
-    
     // Format and display GPS information
-    UART_Printf("GPS Position (%s):\r\n", dateTime);
-    UART_Printf("  Latitude:  %.6f° %c\r\n", fabs(latitude), (latitude >= 0) ? 'N' : 'S');
-    UART_Printf("  Longitude: %.6f° %c\r\n", fabs(longitude), (longitude >= 0) ? 'E' : 'W');
-    UART_Printf("  Altitude:  %.1f meters\r\n", gpsInfo->gga.altitude);
-    UART_Printf("  Speed:     %.1f km/h\r\n", minmea_tofloat(&gpsInfo->rmc.speed) * 1.852); // Convert knots to km/h
-    UART_Printf("  Course:    %.1f°\r\n", minmea_tofloat(&gpsInfo->rmc.course));
-    UART_Printf("  Satellites tracked: %d\r\n", gpsInfo->gga.satellites_tracked);    UART_Printf("  Fix quality: %d\r\n", gpsInfo->gga.fix_quality);
+    UART_Printf("GPS Position:\r\n");
+    UART_Printf("  Date:        %02d.%02d.%02d\r\n", gpsInfo->rmc.date.year, gpsInfo->rmc.date.month, gpsInfo->rmc.date.day);
+    UART_Printf("  Time:        %02d.%02d.%02d\r\n", gpsInfo->rmc.time.hours, gpsInfo->rmc.time.minutes, gpsInfo->rmc.time.seconds);
+    UART_Printf("  Latitude:    %.6f° %c\r\n", fabs(latitude), (latitude >= 0) ? 'N' : 'S');
+    UART_Printf("  Longitude:   %.6f° %c\r\n", fabs(longitude), (longitude >= 0) ? 'E' : 'W');
+    UART_Printf("  Altitude:    %.1f meters\r\n", gpsInfo->gga.altitude);
+    UART_Printf("  Speed:       %.1f km/h\r\n", minmea_tofloat(&gpsInfo->rmc.speed) * 1.852); // Convert knots to km/h
+    UART_Printf("  Course:      %.1f°\r\n", minmea_tofloat(&gpsInfo->rmc.course));
+    UART_Printf("  Fix quality: %d\r\n", gpsInfo->gga.fix_quality);
     UART_Printf("  HDOP: %.1f\r\n", minmea_tofloat(&gpsInfo->gsa[0].hdop));
-
 }
 
 void HandleNetworkStatusCommand(char* param)
