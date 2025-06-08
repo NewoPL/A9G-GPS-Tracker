@@ -20,11 +20,11 @@
 #include "debug.h"
 
 
-#define MAIN_TASK_STACK_SIZE      (2048 * 2)
+#define MAIN_TASK_STACK_SIZE      (4096 * 2)
 #define MAIN_TASK_PRIORITY        (0)
 #define MAIN_TASK_NAME            "GPS Tracker"
 
-#define TRACKER_TASK_STACK_SIZE   (2048 * 2)
+#define TRACKER_TASK_STACK_SIZE   (4096 * 2)
 #define TRACKER_TASK_PRIORITY     (0)
 #define TRACKER_TASK_NAME         "Reporting Task"
 
