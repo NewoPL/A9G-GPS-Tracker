@@ -50,9 +50,9 @@ static struct uart_cmd_entry uart_cmd_table[] = {
     {"tail",         4, HandleTailCommand,            "tail <file> [bytes]", "Print last [bytes] of file (default: 500 bytes)"},
     {"net activate",12, HandleNetworkActivateCommand, "net activate",        "Activate (attach and activate) the network"},
     {"net status",  10, HandleNetworkStatusCommand,   "net status",          "Print network status"},
-    {"sms",          3, HandleSmsCommand,             "sms",                 "Show SMS storage info (default)"},
     {"sms ls",       6, HandleSmsLsCommand,           "sms ls <all|read|unread>", "list SMS messages ()"},
     {"sms rm",       6, HandleSmsRmCommand,           "sms rm <index|all>",  "remove SMS message (rm <index>) or remove all messages (rm all)"},
+    {"sms",          3, HandleSmsCommand,             "sms",                 "Show SMS storage info (default)"},
     {"location",     8, HandleLocationCommand,        "location",            "Show the last known GPS position"},
     {"restart",      7, HandleRestartCommand,         "restart",             "Restart the system immediately"},
 };
@@ -234,7 +234,7 @@ void HandleTailCommand(char* args)
         remaining -= n;
     }
     UART_Printf("\r\n");
-    API_FS_Close(fd);u
+    API_FS_Close(fd);
 }
 
 void HandleLocationCommand(char* param)

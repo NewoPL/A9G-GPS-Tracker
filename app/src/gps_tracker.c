@@ -117,7 +117,7 @@ void gps_trackerTask(void *pData)
                 if (Http_Post(secure, serverName, serverPort, "/", requestBuffer, strlen(requestBuffer), responseBuffer, sizeof(responseBuffer)) < 0)
                     LOGE("FAILED to send the location to the server");
                 else
-                    LOGE("Sent location to %s", serverName);
+                    LOGI("Sent location to %s://%s:%s", (secure ? "https":"http"), serverName,serverPort);
             }
             else
             {

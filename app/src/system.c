@@ -190,6 +190,7 @@ void app_MainTask(void *pData)
             OS_Free(event->pParam1);
             OS_Free(event->pParam2);
             OS_Free(event);
+            OS_SleepUs(0);
         }
     }
 }
