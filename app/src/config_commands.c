@@ -50,7 +50,7 @@ static struct uart_cmd_entry uart_cmd_table[] = {
     {"netactivate", 11, HandleNetworkActivateCommand, "netactivate",         "Activate (attach and activate) the network"},
     {"netstatus",    9, HandleNetworkStatusCommand,   "netstatus",           "Print network status"},
     {"location",     8, HandleLocationCommand,        "location",            "Show the last known GPS position"},
-    {"sms",          3, HandleSmsCommand,             "sms [ls|rm <index>]", "List or remove SMS messages (default: ls)"},
+    {"sms",          3, HandleSmsCommand,             "sms <ls|rm [index]>", "Show SMS storage info (default), list messages (ls), or remove message (rm <index>)"},
 };
 
 
@@ -336,7 +336,24 @@ void HandleHelpCommand(char* args)
 void HandleSmsCommand(char* param)
 {
     param = trim_whitespace(param);
-    if (*param == '\0' || strncmp(param, "ls", 2) == 0) {
+    if (*param == '\0') {
+        // Print all SMS storage info
+        SMS_Storage_Info_t info;
+        if (!SMS_GetStorageInfo(&info, SMS_STORAGE_SIM_CARD)) {
+            UART_Printf("Failed to get SMS storage info.\r\n");
+            return;
+        }
+        UART_Printf("SMS Storage Info (SIM):\r\n");
+        UART_Printf("  Used: %d\r\n", info.used);
+        UART_Printf("  Total: %d\r\n", info.total);
+        UART_Printf("  Unread: %d\r\n", info.unReadRecords);
+        UART_Printf("  Read: %d\r\n", info.readRecords);
+        UART_Printf("  Sent: %d\r\n", info.sentRecords);
+        UART_Printf("  Unsent: %d\r\n", info.unsentRecords);
+        UART_Printf("  Unknown: %d\r\n", info.unknownRecords);
+        UART_Printf("  Storage ID: %d\r\n", info.storageId);
+        return;
+    } else if (strncmp(param, "ls", 2) == 0) {
         // List all SMS messages
         if (!SMS_ListMessageRequst(SMS_STATUS_ALL, SMS_STORAGE_SIM_CARD)) {
             UART_Printf("Failed to request SMS list.\r\n");
