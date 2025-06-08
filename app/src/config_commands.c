@@ -5,6 +5,8 @@
 #include <api_info.h>
 #include <api_hal_pm.h>
 
+#include "system.h"
+#include "network.h"
 #include "gps_tracker.h"
 #include "config_store.h"
 #include "config_commands.h"
@@ -23,6 +25,7 @@ void HandleGetCommand(char*);
 void HandleTailCommand(char*);
 void HandleRestartCommand(char*);
 void HandleNetworkActivateCommand(char*);
+void HandleNetworkStatusCommand(char*);
 
 struct uart_cmd_entry {
     const char* cmd;
@@ -40,7 +43,8 @@ static struct uart_cmd_entry uart_cmd_table[] = {
     {"rm",           2, HandleRemoveFileCommand,      "rm <file>",           "Remove file at specified path"},
     {"tail",         4, HandleTailCommand,            "tail <file> [bytes]", "Print last [bytes] of file (default: 500 bytes)"},
     {"restart",      7, HandleRestartCommand,         "restart",             "Restart the system immediately"},
-    {"netactivate", 11, HandleNetworkActivateCommand, "netactivate",         "Activate (attach and activate) the network"}
+    {"netactivate", 11, HandleNetworkActivateCommand, "netactivate",         "Activate (attach and activate) the network"},
+    {"netstatus",    9, HandleNetworkStatusCommand,   "netstatus",           "Print network status"},
 };
 
 void HandleSetCommand(char* param)
@@ -230,9 +234,22 @@ void HandleRestartCommand(char* args)
 
 bool AttachActivate();
 
+void HandleNetworkStatusCommand(char* param)
+{
+    UART_Printf("Network registered:%d, active:%d\r\n", 
+                IS_GSM_REGISTERED(), IS_GSM_ACTIVE());
+    UART_Printf("Cell info: %s\r\n", g_cellInfo);
+    // Try to parse and print cell info fields if present
+    int mcc = 0, mnc = 0, lac = 0, cellid = 0, rxlev = 0;
+    if (sscanf(g_cellInfo, "%3d,%3d,%d,%d,%d", &mcc, &mnc, &lac, &cellid, &rxlev) == 5) {
+        UART_Printf("  MCC: %03d\r\n  MNC: %03d\r\n  LAC: %d\r\n  CellID: %d\r\n  RxLev: %d\r\n",
+            mcc, mnc, lac, cellid, rxlev);
+    }
+}
+
 void HandleNetworkActivateCommand(char* param)
 {
-    if (AttachActivate()) {
+    if (gsm_AttachActivate()) {
         UART_Printf("Network activated.\r\n");
     } else {
         UART_Printf("Network activation failed.\r\n");

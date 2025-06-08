@@ -1,4 +1,5 @@
 #include <stdbool.h>
+#include <api_fs.h>
 #include <api_inc_time.h>
 
 #include "config_store.h"
@@ -86,4 +87,60 @@ char* trim_whitespace(char* str)
 
     end[1] = '\0';
     return str;
+}
+
+void format_size(char* buf, size_t bufsize, int value, const char* label) {
+    if (value >= 1024*1024*1024) {
+        float gb = value / (1024.0f * 1024.0f * 1024.0f);
+        snprintf(buf, bufsize, "%s%.3f GB", label, gb);
+    } else if (value >= 1024*1024) {
+        float mb = value / (1024.0f * 1024.0f);
+        snprintf(buf, bufsize, "%s%.1f MB", label, mb);
+    } else if (value >= 1024) {
+        float kb = value / 1024.0f;
+        snprintf(buf, bufsize, "%s%.1f KB", label, kb);
+    } else {
+        snprintf(buf, bufsize, "%s%d Bytes", label, value);
+    }
+}
+
+void FsInfoTest()
+{
+    API_FS_INFO fsInfo;
+    int sizeUsed = 0, sizeTotal = 0;
+    char used_buf[32], total_buf[32];
+
+    if(API_FS_GetFSInfo(FS_DEVICE_NAME_FLASH, &fsInfo) < 0)
+    {
+        LOGE("Get Int Flash device info fail!");
+    }
+    sizeUsed  = fsInfo.usedSize;
+    sizeTotal = fsInfo.totalSize;
+    format_size(used_buf, sizeof(used_buf), sizeUsed, "");
+    format_size(total_buf, sizeof(total_buf), sizeTotal, "");
+    LOGI("Int Flash used: %s, total size: %s", used_buf, total_buf);
+
+    if(API_FS_GetFSInfo(FS_DEVICE_NAME_T_FLASH, &fsInfo) < 0)
+    {
+        LOGE("Get Ext Flash device info fail!");
+        return;
+    }
+    sizeUsed  = fsInfo.usedSize;
+    sizeTotal = fsInfo.totalSize;
+    format_size(used_buf, sizeof(used_buf), sizeUsed, "");
+    format_size(total_buf, sizeof(total_buf), sizeTotal, "");
+    LOGI("Ext Flash used: %s, total size: %s", used_buf, total_buf);
+}
+
+uint8_t csq_to_percent(int csq)
+{
+    if (csq < 0 || csq == 99) {
+        // 99 means unknown or undetectable signal
+        return 0;
+    }
+    if (csq > 31) {
+        csq = 31;  // Clamp max value
+    }
+    // Scale 0–31 to 0–100%
+    return (csq * 100) / 31;
 }

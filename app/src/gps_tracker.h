@@ -16,4 +16,8 @@
 #define DEFAULT_LOG_LEVEL         "info"
 #define DEFAULT_LOG_OUTPUT        "uart"
 
+void apnWorkaround_init(void);
+bool gsm_AttachActivate(void);
+void gps_trackerTask(void *pData);
+
 #endif

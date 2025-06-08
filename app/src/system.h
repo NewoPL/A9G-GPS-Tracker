@@ -31,6 +31,11 @@ typedef enum {
 #define GSM_ACTIVE_OFF()   (systemStatus &= ~STATUS_GSM_ACTIVE)
 #define IS_GSM_ACTIVE()    (systemStatus & STATUS_GSM_ACTIVE)
 
+// GSM Registered
+#define GSM_REGISTERED_ON()   (systemStatus |= STATUS_GSM_REGISTERED)
+#define GSM_REGISTERED_OFF()  (systemStatus &= ~STATUS_GSM_REGISTERED)
+#define IS_GSM_REGISTERED()   (systemStatus & STATUS_GSM_REGISTERED)
+
 // Charging
 #define CHARGING_ON()      (systemStatus |= STATUS_CHARGING)
 #define CHARGING_OFF()     (systemStatus &= ~STATUS_CHARGING)
@@ -41,12 +46,10 @@ typedef enum {
 #define SLEEPING_OFF()     (systemStatus &= ~STATUS_SLEEPING)
 #define IS_SLEEPING()      (systemStatus & STATUS_SLEEPING)
 
-// GSM Registered
-#define GSM_REGISTERED_ON()   (systemStatus |= STATUS_GSM_REGISTERED)
-#define GSM_REGISTERED_OFF()  (systemStatus &= ~STATUS_GSM_REGISTERED)
-#define IS_GSM_REGISTERED()   (systemStatus & STATUS_GSM_REGISTERED)
-
 // The actual bitfield variable
 extern uint8_t systemStatus;
+extern uint8_t g_RSSI;
+extern float   g_last_latitude;
+extern float   g_last_longitude;
 
 #endif

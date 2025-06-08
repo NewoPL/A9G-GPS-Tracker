@@ -2,9 +2,11 @@
 #include <stdlib.h>
 
 #include <api_os.h>
+#include <api_network.h>
 #include <api_socket.h>
 #include <api_ssl.h>
 
+#include "system.h"
 #include "gps_tracker.h"
 #include "config_store.h"
 #include "network.h"
@@ -253,4 +255,37 @@ int Http_Post(SSL_Config_t *sslConfig,
         
     OS_Free(buffer);
     return returnVal;
+}
+
+char g_cellInfo[128]  = "\0";
+
+void processNetworkCellInfo(Network_Location_t* loc, int number)
+{
+    g_cellInfo[0] = '\0';
+    if (number <= 0) return;
+    snprintf(g_cellInfo,  sizeof(g_cellInfo), "%u%u%u,%u%u%u,%u,%u,%d",
+             loc->sMcc[0], loc->sMcc[1], loc->sMcc[2], loc->sMnc[0], loc->sMnc[1], loc->sMnc[2], loc->sLac, loc->sCellID, loc->iRxLev);
+}
+
+// Timer handle for periodic cell info refresh
+static HANDLE networkInfoTimerHandle = NULL;
+
+void network_info(void* param)
+{
+    if (param == NULL) return;
+
+    if (IS_GSM_REGISTERED()) {
+        if(!Network_GetCellInfoRequst()) {
+            g_cellInfo[0] = '\0';
+            LOGE("network get cell info fail");
+        }
+    }
+
+    HANDLE taskHandle = (HANDLE)param;
+    network_info_start(taskHandle);
+}
+
+void network_info_start(HANDLE taskHandle)
+{  
+    OS_StartCallbackTimer(taskHandle, 15000, network_info, (void*)taskHandle);
 }
