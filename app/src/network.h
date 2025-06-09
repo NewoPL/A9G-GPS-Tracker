@@ -48,4 +48,6 @@ Network_Status_t NetworkGetStatus(void);
  */
 void NetworkCellInfoCallback(Network_Location_t* loc, int number);
 
+extern uint8_t g_RSSI;
+
 #endif

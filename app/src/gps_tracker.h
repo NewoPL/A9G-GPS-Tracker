@@ -16,6 +16,16 @@
 #define DEFAULT_LOG_LEVEL         "info"
 #define DEFAULT_LOG_OUTPUT        "uart"
 
-void gps_trackerTask(void *pData);
+
+bool  gps_isValid(void);
+
+// Get the last known GPS coordinates
+// Returns the latitude in degrees  
+float gps_GetLastLatitude(void);
+
+// Returns the longitude in degrees
+float gps_GetLastLongitude(void);
+
+void  gps_trackerTask(void *pData);
 
 #endif

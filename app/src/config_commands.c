@@ -28,6 +28,7 @@ void HandleTailCommand(char*);
 void HandleRestartCommand(char*);
 void HandleNetworkActivateCommand(char*);
 void HandleNetworkStatusCommand(char*);
+void HandleNetworkDeactivateCommand(char*);
 void HandleLocationCommand(char*);
 void HandleSmsCommand(char*);
 void HandleSmsLsCommand(char*);
@@ -42,21 +43,50 @@ struct uart_cmd_entry {
 };
 
 static struct uart_cmd_entry uart_cmd_table[] = {
-    {"help",         4, HandleHelpCommand,            "help",                "Show this help message"},
-    {"set",          3, HandleSetCommand,             "set <param> [value]", "Set value to a specified parameter. if no value provided parameter will be cleared."},
-    {"get",          3, HandleGetCommand,             "get [para]",          "Print a value of a specified parameter. (for no parameter it prints all config)"},
-    {"ls",           2, HandleLsCommand,              "ls [path]",           "List files in specified folder (default: /)"},
-    {"rm",           2, HandleRemoveFileCommand,      "rm <file>",           "Remove file at specified path"},
-    {"tail",         4, HandleTailCommand,            "tail <file> [bytes]", "Print last [bytes] of file (default: 500 bytes)"},
-    {"net activate",12, HandleNetworkActivateCommand, "net activate",        "Activate (attach and activate) the network"},
-    {"net status",  10, HandleNetworkStatusCommand,   "net status",          "Print network status"},
-    {"sms",          3, HandleSmsCommand,             "sms",                 "Show SMS storage info (default)"},
-    {"sms ls",       6, HandleSmsLsCommand,           "sms ls <all|read|unread>", "list SMS messages ()"},
-    {"sms rm",       6, HandleSmsRmCommand,           "sms rm <index|all>",  "remove SMS message (rm <index>) or remove all messages (rm all)"},
-    {"location",     8, HandleLocationCommand,        "location",            "Show the last known GPS position"},
-    {"restart",      7, HandleRestartCommand,         "restart",             "Restart the system immediately"},
+    {"help",           4, HandleHelpCommand,            "help",                "Show this help message"},
+    {"set",            3, HandleSetCommand,             "set <param> [value]", "Set value to a specified parameter. if no value provided parameter will be cleared."},
+    {"get",            3, HandleGetCommand,             "get [para]",          "Print a value of a specified parameter. (for no parameter it prints all config)"},
+    {"ls",             2, HandleLsCommand,              "ls [path]",           "List files in specified folder (default: /)"},
+    {"rm",             2, HandleRemoveFileCommand,      "rm <file>",           "Remove file at specified path"},
+    {"tail",           4, HandleTailCommand,            "tail <file> [bytes]", "Print last [bytes] of file (default: 500 bytes)"},
+    {"net activate",  12, HandleNetworkActivateCommand, "net activate",        "Activate (attach and activate) the network"},
+    {"net deactivate",14, HandleNetworkDeactivateCommand, "net deactivate",    "Deactivate (detach and deactivate) the network"},
+    {"net status",    10, HandleNetworkStatusCommand,   "net status",          "Print network status"},
+    {"sms",            3, HandleSmsCommand,             "sms",                 "Show SMS storage info (default)"},
+    {"sms ls",         6, HandleSmsLsCommand,           "sms ls <all|read|unread>", "list SMS messages ()"},
+    {"sms rm",         6, HandleSmsRmCommand,           "sms rm <index|all>",  "remove SMS message (rm <index>) or remove all messages (rm all)"},
+    {"location",       8, HandleLocationCommand,        "location",            "Show the last known GPS position"},
+    {"restart",        7, HandleRestartCommand,         "restart",             "Restart the system immediately"},
 };
 
+static unsigned uart_cmd_sorted_idx[sizeof(uart_cmd_table)/sizeof(uart_cmd_table[0])];
+static size_t uart_cmd_table_size = 0;
+
+/**
+ * Initializes the sorted index for the UART command table.
+ * This function sorts the command table based on command length in descending order.
+ * It uses a simple selection sort algorithm, which is efficient for small arrays.
+ * The sorted index is used to quickly find commands based on their length.
+ * This function should be called once before processing commands by HandleUartCommand()
+ */
+static void InitUartCmdTableSortedIdx(void)
+{
+    uart_cmd_table_size = sizeof(uart_cmd_table)/sizeof(uart_cmd_table[0]);
+    for (unsigned i = 0; i < uart_cmd_table_size; ++i) uart_cmd_sorted_idx[i] = i;
+    // Simple selection sort for small table
+    for (unsigned i = 0; i < uart_cmd_table_size-1; ++i) {
+        unsigned maxj = i;
+        for (unsigned j = i+1; j < uart_cmd_table_size; ++j) {
+            if (uart_cmd_table[uart_cmd_sorted_idx[j]].cmd_len > uart_cmd_table[uart_cmd_sorted_idx[maxj]].cmd_len)
+                maxj = j;
+        }
+        if (maxj != i) {
+            unsigned tmp = uart_cmd_sorted_idx[i];
+            uart_cmd_sorted_idx[i] = uart_cmd_sorted_idx[maxj];
+            uart_cmd_sorted_idx[maxj] = tmp;
+        }
+    }
+}
 
 void HandleSetCommand(char* param)
 {
@@ -234,7 +264,7 @@ void HandleTailCommand(char* args)
         remaining -= n;
     }
     UART_Printf("\r\n");
-    API_FS_Close(fd);u
+    API_FS_Close(fd);
 }
 
 void HandleLocationCommand(char* param)
@@ -309,6 +339,15 @@ void HandleNetworkActivateCommand(char* param)
         UART_Printf("Network activated.\r\n");
     } else {
         UART_Printf("Network activation failed.\r\n");
+    }
+}
+
+void HandleNetworkDeactivateCommand(char* param)
+{
+    if (Network_StartDeactive(1)) {
+        UART_Printf("Network deactivated.\r\n");
+    } else {
+        UART_Printf("Network deactivation failed.\r\n");
     }
 }
 
@@ -410,7 +449,9 @@ void HandleSmsListEvent(SMS_Message_Info_t* msg)
 void HandleUartCommand(char* cmd)
 {
     cmd = trim_whitespace(cmd);
-    for (unsigned i = 0; i < sizeof(uart_cmd_table)/sizeof(uart_cmd_table[0]); ++i) {
+    if (uart_cmd_table_size == 0) InitUartCmdTableSortedIdx();
+    for (unsigned k = 0; k < uart_cmd_table_size; ++k) {
+        unsigned i = uart_cmd_sorted_idx[k];
         const char* c = uart_cmd_table[i].cmd;
         int len = uart_cmd_table[i].cmd_len;
         if (strncmp(cmd, c, len) == 0 && (cmd[len] == ' ' || cmd[len] == '\0')) {
