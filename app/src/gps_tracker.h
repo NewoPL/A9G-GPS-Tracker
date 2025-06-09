@@ -16,6 +16,7 @@
 #define DEFAULT_LOG_LEVEL         "info"
 #define DEFAULT_LOG_OUTPUT        "uart"
 
+void  gps_Init(void);
 
 bool  gps_isValid(void);
 
@@ -25,6 +26,10 @@ float gps_GetLastLatitude(void);
 
 // Returns the longitude in degrees
 float gps_GetLastLongitude(void);
+
+void  gps_Process(void);
+
+void  gps_PrintLocation(void);
 
 void  gps_trackerTask(void *pData);
 

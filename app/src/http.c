@@ -157,24 +157,13 @@ static inline int https_send_receive(const char   *hostName,
         return error;
     }
 
-        // Resolve IP address from hostname
-    char IPAddr[INET_ADDRSTRLEN];
-    memset(IPAddr, 0, sizeof(IPAddr));
-    if(DNS_GetHostByName2(hostName, IPAddr) != 0) {
-        LOGI("Cannot resolve the hostName name");
-        return SSL_ERROR_INTERNAL;
-    }
-    LOGD("Resolved IP for %s -> %s", hostName, IPAddr);
-    
-    UART_Write(UART1,"[",1);
     // Connect to server using IP address
-    error = SSL_Connect(&SSLconfig, IPAddr, port);
+    error = SSL_Connect(&SSLconfig, hostName, port);
     if(error != SSL_ERROR_NONE) {
         LOGI("SSL connect error: %d", error);
         goto err_ssl_destroy;
     }
 
-    UART_Write(UART1,"w",1);
     // Send package
     error = SSL_Write(&SSLconfig, buffer, bufferLen, SSL_WRITE_TIMEOUT);
     if(error <= 0) {
@@ -182,7 +171,6 @@ static inline int https_send_receive(const char   *hostName,
         goto err_ssl_close;
     }
 
-    UART_Write(UART1,"r",1);
     // Read response
     memset(retBuffer, 0, retBufferSize);
     error = SSL_Read(&SSLconfig, retBuffer, retBufferSize, SSL_READ_TIMEOUT);
@@ -197,7 +185,6 @@ static inline int https_send_receive(const char   *hostName,
     }
 
 err_ssl_close:
-    UART_Write(UART1,"]",1);
     if (SSL_Close(&SSLconfig) != SSL_ERROR_NONE) {
         LOGI("SSL close error: %d", error);
     }

@@ -275,31 +275,8 @@ void HandleLocationCommand(char* param)
     if (!IS_GPS_STATUS_ON()) {
         UART_Printf("GPS is not active.\r\n");
         return;
-    }
-
-    UART_Printf("Satellites visible: %d, tracked: %d\r\n", 
-                gpsInfo->gsv[0].total_sats, 
-                gpsInfo->gga.satellites_tracked);    
-    
-    if (!gpsInfo->rmc.valid)
-        UART_Printf("No valid GPS fix available.\r\n");
-
-    // Convert NMEA coordinates (DDMM.MMMM format) to decimal degrees
-    float latitude = minmea_tocoord(&gpsInfo->rmc.latitude);
-    float longitude = minmea_tocoord(&gpsInfo->rmc.longitude);
-    
-    // Format and display GPS information
-    UART_Printf("GPS Position:\r\n");
-    UART_Printf("  Date:        %02d.%02d.%02d\r\n", gpsInfo->rmc.date.year, gpsInfo->rmc.date.month, gpsInfo->rmc.date.day);
-    UART_Printf("  Time:        %02d.%02d.%02d\r\n", gpsInfo->rmc.time.hours, gpsInfo->rmc.time.minutes, gpsInfo->rmc.time.seconds);
-    UART_Printf("  Latitude:    %.6f° %c\r\n", fabs(latitude), (latitude >= 0) ? 'N' : 'S');
-    UART_Printf("  Longitude:   %.6f° %c\r\n", fabs(longitude), (longitude >= 0) ? 'E' : 'W');
-    UART_Printf("  Altitude:    %.1f meters\r\n", gpsInfo->gga.altitude);
-    UART_Printf("  Speed:       %.1f km/h\r\n", minmea_tofloat(&gpsInfo->rmc.speed) * 1.852); // Convert knots to km/h
-    UART_Printf("  Course:      %.1f°\r\n", minmea_tofloat(&gpsInfo->rmc.course));
-    UART_Printf("  Fix quality: %d\r\n", gpsInfo->gga.fix_quality);
-    UART_Printf("  HDOP: %.1f\r\n", minmea_tofloat(&gpsInfo->gsa[0].hdop));
-
+    }   
+    gps_PrintLocation();
     return;
 }
 

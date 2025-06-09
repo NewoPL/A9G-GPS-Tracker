@@ -118,7 +118,7 @@ static void EventHandler(API_Event_t* pEvent)
                 LOGD("received GPS data, length:%d, data:\r\n%s",pEvent->param1,pEvent->pParam1);
             GPS_STATUS_ON();
             GPS_Update(pEvent->pParam1, pEvent->param1);
-
+            gps_Process();
             break;
         
         case API_EVENT_ID_UART_RECEIVED:
@@ -156,7 +156,7 @@ void app_MainTask(void *pData)
     TIME_SetIsAutoUpdateRtcTime(true);
     ConfigStore_Init();
     FsInfoTest();    
-    GPS_Init();
+    gps_Init();
     SMSInit();
 
     trackerTaskHandle = OS_CreateTask(

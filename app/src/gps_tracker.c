@@ -17,21 +17,74 @@
 #include "utils.h"
 #include "debug.h"
 
+GPS_Info_t* gpsInfo = NULL;
+
+void gps_Init() 
+{
+    GPS_Init();
+    gpsInfo = Gps_GetInfo();
+}
+
+typedef struct {
+    time_t timestamp;
+    float  latitude;
+    float  longitude;
+    float  speed;
+    float  bearing;
+    float  altitude;
+    float  accuracy;
+} GpsTrackerData_t;
+
+GpsTrackerData_t GpsTrackerData;
+
+void gps_Process(void)
+{
+    GpsTrackerData.timestamp = mk_time(&gpsInfo->rmc.date, &gpsInfo->rmc.time);
+
+    // Convert NMEA coordinates (DDMM.MMMM format) to decimal degrees
+    GpsTrackerData.latitude  = minmea_tocoord(&gpsInfo->rmc.latitude);
+    GpsTrackerData.longitude = minmea_tocoord(&gpsInfo->rmc.longitude);
+   
+    // convert other data a floating point 
+    GpsTrackerData.speed     = minmea_tofloat(&gpsInfo->rmc.speed);
+    GpsTrackerData.bearing   = minmea_tofloat(&gpsInfo->rmc.course);
+    GpsTrackerData.altitude  = minmea_tofloat(&gpsInfo->gga.altitude);
+    GpsTrackerData.accuracy  = minmea_tofloat(&gpsInfo->gsa[0].hdop) * 
+                                               g_ConfigStore.gps_uere; // User Equivalent Range Error (UERE) in meters 
+
+    return;    
+}
+
+void gps_PrintLocation(void)
+{
+    if (!gpsInfo->rmc.valid)
+        UART_Printf("INVALID, ");
+    else 
+    {
+       // Format and display GPS information
+        UART_Printf("%02d.%02d.%02d ", gpsInfo->rmc.date.year, gpsInfo->rmc.date.month, gpsInfo->rmc.date.day);
+        UART_Printf("%02d.%02d.%02d, ", gpsInfo->rmc.time.hours, gpsInfo->rmc.time.minutes, gpsInfo->rmc.time.seconds);
+    }
+    UART_Printf("sat visble:%d, sat tracked:%d, ", gpsInfo->gsv[0].total_sats, gpsInfo->gga.satellites_tracked);
+    UART_Printf("lat: %.6f° %c, lon: %.6f° %c, ", fabs(GpsTrackerData.latitude), (GpsTrackerData.latitude >= 0) ? 'N' : 'S',
+                                                  fabs(GpsTrackerData.longitude), (GpsTrackerData.longitude >= 0) ? 'E' : 'W');
+    UART_Printf("alt: %.1f, spd=%.1f, hdg=.1f, ", gpsInfo->gga.altitude, GpsTrackerData.speed, GpsTrackerData.bearing);
+    UART_Printf("accur: %.1f\r\n", GpsTrackerData.accuracy);
+    return;
+}
+
 float gps_GetLastLatitude(void)
 {
-    GPS_Info_t* gpsInfo = Gps_GetInfo();
-    return minmea_tocoord(&gpsInfo->rmc.latitude);
+    return GpsTrackerData.latitude;
 }
 
 float gps_GetLastLongitude(void)
 {
-    GPS_Info_t* gpsInfo = Gps_GetInfo();
-    return minmea_tocoord(&gpsInfo->rmc.longitude);
+    return GpsTrackerData.longitude;
 }
 
 bool  gps_isValid(void) 
 {
-    GPS_Info_t* gpsInfo = Gps_GetInfo();
     return gpsInfo->rmc.valid && 
            (gpsInfo->rmc.latitude.scale != 0) && 
            (gpsInfo->rmc.longitude.scale != 0);
@@ -79,45 +132,16 @@ void gps_trackerTask(void *pData)
     LOGI("setting GPS interval to 1000 ms");
     if(!GPS_SetOutputInterval(1000))
         LOGE("set GPS interval failed");
-    
-    const char *device_name = g_ConfigStore.device_name;
-    LOGI("Device name: %s", device_name);
 
     while(1)
     {
-        GPS_Info_t* gpsInfo = Gps_GetInfo();
         uint32_t    loop_start = time(NULL);
         if(IS_GPS_STATUS_ON()) // && gps_isValid)
         {
-            time_t gps_timestamp = mk_time(&gpsInfo->rmc.date, &gpsInfo->rmc.time);
-
-            float latitude  = minmea_tocoord(&gpsInfo->rmc.latitude);
-            float longitude = minmea_tocoord(&gpsInfo->rmc.longitude);
-            // convert other data a floating point 
-            float speed     = minmea_tofloat(&gpsInfo->rmc.speed);
-            float bearing   = minmea_tofloat(&gpsInfo->rmc.course);
-            float altitude  = minmea_tofloat(&gpsInfo->gga.altitude);
-            float accuracy  = minmea_tofloat(&gpsInfo->gsa[0].hdop) * 
-                              g_ConfigStore.gps_uere; // User Equivalent Range Error (UERE) in meters 
-
             uint8_t percent;
             PM_Voltage(&percent);
 
-            /*
-            snprintf(responseBuffer, sizeof(responseBuffer),"%02d.%02d.%02d %02d:%02d.%02d, "
-                                                            "sat visible:%d, sat tracked:%d, "
-                                                            "Lat:%f, Lon:%f, alt:%f, "
-                                                            "error = %.1f, "
-                                                            "spd= %.1f, hdg= %.1f, bat= %d\r\n",
-                                                            gpsInfo->rmc.date.year,gpsInfo->rmc.date.month, gpsInfo->rmc.date.day,
-                                                            gpsInfo->rmc.time.hours,gpsInfo->rmc.time.minutes,gpsInfo->rmc.time.seconds,
-                                                            gpsInfo->gsv[0].total_sats, gpsInfo->gga.satellites_tracked,
-                                                            latitude, longitude, altitude, accuracy, speed, bearing, percent);
-            responseBuffer[sizeof(responseBuffer) - 1] = '\0';
-
-            //send to UART1
-            UART_Write(UART1, responseBuffer, strlen(responseBuffer));
-            */
+            gps_PrintLocation();
 
             responseBuffer[0] = '\0';
             if (strlen(g_cellInfo) != 0) {
@@ -126,7 +150,10 @@ void gps_trackerTask(void *pData)
 
             snprintf(requestBuffer, sizeof(requestBuffer),
                      "id=%s&valid=%d&timestamp=%d&lat=%f&lon=%f&speed=%1.f&bearing=%.1f&altitude=%.1f&accuracy=%.1f%s&batt=%d",
-                     device_name, gpsInfo->rmc.valid, gps_timestamp, latitude, longitude, speed, bearing, altitude, accuracy, responseBuffer, percent);
+                     g_ConfigStore.device_name, gpsInfo->rmc.valid, GpsTrackerData.timestamp,
+                     GpsTrackerData.latitude, GpsTrackerData.longitude, 
+                     GpsTrackerData.speed, GpsTrackerData.bearing, GpsTrackerData.altitude, 
+                     GpsTrackerData.accuracy, responseBuffer, percent);
             requestBuffer[sizeof(requestBuffer) - 1] = '\0';
 
             if(IS_GSM_ACTIVE())
@@ -134,11 +161,13 @@ void gps_trackerTask(void *pData)
                 const char* serverName = g_ConfigStore.server_addr;
                 const char* serverPort = g_ConfigStore.server_port;
                 bool secure = (g_ConfigStore.server_protocol == PROT_HTTPS);
-                int result = Http_Post(secure, serverName, serverPort, "/", requestBuffer, strlen(requestBuffer), responseBuffer, sizeof(responseBuffer));
-                if ( result < 0)
+                int result = Http_Post(secure, serverName, serverPort, "/", 
+                                       requestBuffer, strlen(requestBuffer),
+                                       responseBuffer, sizeof(responseBuffer));
+                if (result < 0)
                     LOGE("FAILED to send the location to the server. err: %d", result);
                 else
-                    LOGI("Sent location to %s://%s:%s", (secure ? "https":"http"), serverName,serverPort);
+                    LOGI("Sent location to %s://%s:%s", (secure ? "https":"http"), serverName, serverPort);
             }
             else
             {
