@@ -1,256 +1,163 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #include <api_os.h>
-#include <api_socket.h>
-#include <api_ssl.h>
+#include <api_network.h>
 
+#include "system.h"
 #include "gps_tracker.h"
 #include "config_store.h"
 #include "network.h"
 #include "debug.h"
 
-const char *ca_cert = "-----BEGIN CERTIFICATE-----\n\
-MIICjjCCAjOgAwIBAgIQf/NXaJvCTjAtkOGKQb0OHzAKBggqhkjOPQQDAjBQMSQw\n\
-IgYDVQQLExtHbG9iYWxTaWduIEVDQyBSb290IENBIC0gUjQxEzARBgNVBAoTCkds\n\
-b2JhbFNpZ24xEzARBgNVBAMTCkdsb2JhbFNpZ24wHhcNMjMxMjEzMDkwMDAwWhcN\n\
-MjkwMjIwMTQwMDAwWjA7MQswCQYDVQQGEwJVUzEeMBwGA1UEChMVR29vZ2xlIFRy\n\
-dXN0IFNlcnZpY2VzMQwwCgYDVQQDEwNXRTEwWTATBgcqhkjOPQIBBggqhkjOPQMB\n\
-BwNCAARvzTr+Z1dHTCEDhUDCR127WEcPQMFcF4XGGTfn1XzthkubgdnXGhOlCgP4\n\
-mMTG6J7/EFmPLCaY9eYmJbsPAvpWo4IBAjCB/zAOBgNVHQ8BAf8EBAMCAYYwHQYD\n\
-VR0lBBYwFAYIKwYBBQUHAwEGCCsGAQUFBwMCMBIGA1UdEwEB/wQIMAYBAf8CAQAw\n\
-HQYDVR0OBBYEFJB3kjVnxP+ozKnme9mAeXvMk/k4MB8GA1UdIwQYMBaAFFSwe61F\n\
-uOJAf/sKbvu+M8k8o4TVMDYGCCsGAQUFBwEBBCowKDAmBggrBgEFBQcwAoYaaHR0\n\
-cDovL2kucGtpLmdvb2cvZ3NyNC5jcnQwLQYDVR0fBCYwJDAioCCgHoYcaHR0cDov\n\
-L2MucGtpLmdvb2cvci9nc3I0LmNybDATBgNVHSAEDDAKMAgGBmeBDAECATAKBggq\n\
-hkjOPQQDAgNJADBGAiEAokJL0LgR6SOLR02WWxccAq3ndXp4EMRveXMUVUxMWSMC\n\
-IQDspFWa3fj7nLgouSdkcPy1SdOR2AGm9OQWs7veyXsBwA==\n\
------END CERTIFICATE-----";
+char                         g_cellInfo[128] = "\0";
+static Network_Status_t      g_NetworkStatus = 0;
+static Network_PDP_Context_t NetContextArr[2]; // Two-element array: [0]=real APN, [1]=dummy APN
+static bool apn_workaround_pending = false;  
 
-static inline int http_send_receive(const char *hostName,
-                                    const char *port,
-                                    char       *sendBuffer,
-                                    int         sendBufferLen,
-                                    char       *retBuffer,
-                                    int         retBufferSize)
+static void Network_SetCellInfoTimer(HANDLE);
+
+void NetworkCellInfoGet(void* param)
 {
-    if (!hostName || !port || !sendBuffer || sendBufferLen <= 0 || !retBuffer || retBufferSize <= 0) {
-        LOGE("Invalid input parameters");
-        return -1;
-    }
+    if (param == NULL) return;
 
-    // Get IP from DNS server.
-    char IPAddr[INET_ADDRSTRLEN];
-    memset(IPAddr, 0, sizeof(IPAddr));
-    if(DNS_GetHostByName2(hostName, IPAddr) != 0) {
-        LOGE("Cannot resolve the hostName name");
-        return -1;
-    }
-    LOGD("Resolved IP for %s -> %s", hostName, IPAddr);
-
-    int fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if(fd < 0) {
-        LOGE("socket fail");
-        return -1;
-    }
-
-    int port_num = strtol(port, NULL, 10);
-    if (port_num <= 0 || port_num > 65535) {
-        LOGE("Invalid port number");
-        close(fd);
-        return -1;
-    }
-
-    struct sockaddr_in sockaddr;
-    memset(&sockaddr, 0, sizeof(sockaddr));
-    sockaddr.sin_family = AF_INET;
-    sockaddr.sin_port = htons(port_num);
-    inet_pton(AF_INET, IPAddr, &sockaddr.sin_addr);
-
-    int ret = connect(fd, (struct sockaddr*)&sockaddr, sizeof(struct sockaddr_in));
-    if(ret < 0){
-        LOGE("socket connect fail");
-        close(fd);
-        return -1;
-    }
-
-    int totalSent = 0;
-    while (totalSent < sendBufferLen) {
-        ret = send(fd, sendBuffer + totalSent, sendBufferLen - totalSent, 0);
-        if (ret <= 0) {
-            LOGE("socket send fail");
-            close(fd);
-            return -1;
+    if (IS_GSM_REGISTERED()) {
+        if(!Network_GetCellInfoRequst()) {
+            g_cellInfo[0] = '\0';
+            LOGE("network get cell info fail");
         }
-        totalSent += ret;
+    } else {
+        g_cellInfo[0] = '\0';
     }
 
-    uint16_t recvLen = 0;
-    while (recvLen < retBufferSize)
+    HANDLE taskHandle = (HANDLE)param;
+    Network_SetCellInfoTimer(taskHandle);
+}
+
+void NetworkCellInfoCallback(Network_Location_t* loc, int number)
+{
+    g_cellInfo[0] = '\0';
+    if (number <= 0) return;
+    snprintf(g_cellInfo,  sizeof(g_cellInfo), "%u%u%u,%u%u%u,%u,%u,%d",
+             loc->sMcc[0], loc->sMcc[1], loc->sMcc[2], loc->sMnc[0], loc->sMnc[1], loc->sMnc[2], loc->sLac, loc->sCellID, loc->iRxLev);
+}
+
+static void Network_SetCellInfoTimer(HANDLE taskHandle)
+{  
+    OS_StartCallbackTimer(taskHandle, 15000, NetworkCellInfoGet, (void*)taskHandle);
+}
+
+// OS Calls this function whenever the network state changes
+void NetworkUpdateStatus(Network_Status_t status)
+{
+    const char* status_str = "UNKNOWN";
+    switch (status) {
+        case NETWORK_STATUS_OFFLINE:        status_str = "OFFLINE"; break;
+        case NETWORK_STATUS_REGISTERING:    status_str = "REGISTERING"; break;
+        case NETWORK_STATUS_REGISTERED:     status_str = "REGISTERED"; break;
+        case NETWORK_STATUS_DETACHED:       status_str = "DETACHED"; break;
+        case NETWORK_STATUS_ATTACHING:      status_str = "ATTACHING"; break;
+        case NETWORK_STATUS_ATTACHED:       status_str = "ATTACHED"; break;
+        case NETWORK_STATUS_DEACTIVED:      status_str = "DEACTIVED"; break;
+        case NETWORK_STATUS_ACTIVATING:     status_str = "ACTIVATING"; break;
+        case NETWORK_STATUS_ACTIVATED:      status_str = "ACTIVATED"; break;
+        case NETWORK_STATUS_ATTACH_FAILED:  status_str = "ATTACH_FAILED"; break;
+        case NETWORK_STATUS_ACTIVATE_FAILED:status_str = "ACTIVATE_FAILED"; break;
+        default:                            status_str = "INVALID"; break;
+    }
+    LOGI("[Network] UpdateStatus called with status=%d (%s)", status, status_str);
+    g_NetworkStatus = status;
+}
+
+Network_Status_t NetworkGetStatus()
+{
+    return g_NetworkStatus;
+}
+
+void NetworkInit(HANDLE taskHandle)
+{
+    Network_SetStatusChangedCallback(NetworkUpdateStatus);
+
+    // APN Re-activation Workaround
+    //
+    // the firmware has a defect where re-activating the same APN after deactivation fails.
+    // To work around this, we:
+    //   1. Attempt to activate a dummy/incorrect APN first (NetContextArr[1]).
+    //   2. Wait for a network deactivation event (which occurs because the dummy APN fails).
+    //   3. Then activate the real APN (NetContextArr[0]).
+    //
+    // This workaround is managed by the apn_workaround_pending flag and the AttachActivate() function.
+    // The dummy APN context is set once at system initialization. The real APN context is set as needed.
+    // All logic for the workaround is centralized in AttachActivate; 
+    apn_workaround_pending = false;
+
+    // Dummy APN (index 1) context is set once at system init
+    memset(&NetContextArr[1], 0, sizeof(NetContextArr[1]));
+    strncpy(NetContextArr[1].apn, "dummy_apn", sizeof(NetContextArr[1].apn)-1);
+
+    Network_SetCellInfoTimer(taskHandle);
+
+    return;
+}
+
+
+// Helper to initialize the real APN context
+static void SetApnContext() {
+    // Real APN (index 0)
+    memset(&NetContextArr[0], 0, sizeof(NetContextArr[0]));
+    strncpy(NetContextArr[0].apn, g_ConfigStore.apn, sizeof(NetContextArr[0].apn)-1);
+    strncpy(NetContextArr[0].userName, g_ConfigStore.apn_user, sizeof(NetContextArr[0].userName)-1);
+    strncpy(NetContextArr[0].userPasswd, g_ConfigStore.apn_pass, sizeof(NetContextArr[0].userPasswd)-1);
+}
+
+bool NetworkAttachActivate()
+{
+    uint8_t status;
+    bool ret = Network_GetAttachStatus(&status);
+    if(!ret)
     {
-        struct fd_set fds;
-        struct timeval timeout = {12, 0};
-        FD_ZERO(&fds);
-        FD_SET(fd, &fds);
-
-        ret = select(fd+1, &fds, NULL, NULL, &timeout);
-        if (ret == -1) {
-            LOGE("HTTP response error");
-            close(fd);
-            return -1;
-        }
-        if (ret == 0) {
-            LOGE("HTTP response timeout");
-            close(fd);
-            return -1;
-        }
-        if(FD_ISSET(fd, &fds))
+        LOGE("get attach status failed");
+        return false;
+    }
+    if(!status)
+    {
+        ret = Network_StartAttach();
+        LOGI("attaching to the network");
+        if(!ret)
         {
-            int toRead = retBufferSize - recvLen;
-            ret = recv(fd, retBuffer + recvLen, toRead, 0);
-            if(ret < 0)
-            {
-                LOGE("recv error");
-                close(fd);
-                return -1;
-            }
-            if(ret == 0)
-            {
-                LOGI("connection closed by peer");
-                break;
-            }
-            recvLen += ret;
+            LOGE("network attach failed");
+            return false;
         }
     }
-    close(fd);
-    return recvLen;
-}
-
-
-static inline int https_send_receive(SSL_Config_t *sslConfig,
-                                     const char   *hostName,
-                                     const char   *port,
-                                     char         *buffer,
-                                     int           bufferLen,
-                                     char         *retBuffer,
-                                     int           retBufferSize)
-{
-    SSL_Error_t error;
-    sslConfig->caCert = ca_cert;
-    sslConfig->hostName = hostName;
-
-    error = SSL_Init(sslConfig);
-    if(error != SSL_ERROR_NONE) {
-        LOGD("SSL init error: %d", error);
-        return error;
-    }
-
-    // Connect to server
-    error = SSL_Connect(sslConfig, hostName, port);
-    if(error != SSL_ERROR_NONE) {
-        LOGD("SSL connect error: %d", error);
-        goto err_ssl_destroy;
-    }
-
-    // Send package
-    error = SSL_Write(sslConfig, buffer, bufferLen, SSL_WRITE_TIMEOUT);
-    if(error <= 0) {
-        LOGD("SSL Write error: %d", error);
-        goto err_ssl_close;
-    }
-
-    // Read response
-    memset(retBuffer, 0, retBufferSize);
-    error = SSL_Read(sslConfig, retBuffer, retBufferSize, SSL_READ_TIMEOUT);
-    if(error < 0) {
-        LOGD("SSL Read error: %d", error);
-        goto err_ssl_close;
-    }
-    if(error == 0) {
-        LOGD("SSL no receive response");
-        error = SSL_ERROR_INTERNAL;
-        goto err_ssl_close;
-    }
-
-err_ssl_close:
-    if (SSL_Close(sslConfig) != SSL_ERROR_NONE) {
-        LOGD("SSL close error: %d", error);
-    }
-
-err_ssl_destroy:
-    if (SSL_Destroy(sslConfig) != SSL_ERROR_NONE) {
-        LOGD("SSL destroy error: %d", error);
-    }
-
-    return error;
-}
-
-
-int Http_Post(SSL_Config_t *sslConfig,
-              const char   *hostName, 
-              const char   *port, 
-              const char   *path, 
-              const char   *data, 
-              uint16_t      dataLen,
-              char*         retBuffer, 
-              int           retBufferSize)
-{
-    if (strlen(data) != dataLen) {
-        LOGE("DataLen mismatch with actual data length");
-        return -1;
-    }
-
-    // Create the HTTP POST request template
-    const char* fmt = "POST %s HTTP/1.1\r\n"
-                      "Host: %s\r\n"
-                      "Content-Type: application/x-www-form-urlencoded\r\n"
-                      "Connection: close\r\n"
-                      "Content-Length: %d\r\n\r\n%s";
-
-    // Calculate the required buffer size
-    int bufferLen = snprintf(NULL, 0, fmt, path, hostName, dataLen, data);
-    if (bufferLen <= 0) {
-        LOGE("Failed to calculate buffer size");
-        return -1;
-    }
-
-    // Allocate the buffer dynamically
-    char* buffer = (char*)OS_Malloc(bufferLen + 1);
-    if (!buffer) {
-        LOGE("Failed to allocate memory for HTTP package");
-        return -1;
-    }
-     
-    // Build the complete HTTP POST request
-    snprintf(buffer, bufferLen, fmt, path, hostName, dataLen, data);
-    buffer[bufferLen] = 0;
-
-#if 0
-    UART_Printf("HTTP Package:\r\n");
-    UART_Write(UART1, buffer, bufferLen);
-    UART_Printf("\r\n");
-#endif
-
-    int returnVal =  -1;
-
-    if (sslConfig == NULL)
-        // Use HTTP for non-secure connection
-        returnVal = http_send_receive(hostName,
-                                      port,
-                                      buffer,
-                                      bufferLen,
-                                      retBuffer,
-                                      retBufferSize);
     else
-        // Use SSL for secure connection        
-        returnVal = https_send_receive(sslConfig,
-                                       hostName,
-                                       port,
-                                       buffer,
-                                       bufferLen,
-                                       retBuffer,
-                                       retBufferSize);
-        
-    OS_Free(buffer);
-    return returnVal;
+    {
+        ret = Network_GetActiveStatus(&status);
+        if(!ret)
+        {
+            LOGE("get activate status failed");
+            return false;
+        }
+        if(!status)
+        {
+            LOGI("activating the network");
+
+            // Implements the APN re-activation workaround:
+            // - If workaround is pending, activate the real APN (NetContextArr[0]) and clear the flag.
+            // - Otherwise, activate the dummy APN (NetContextArr[1]) and set the flag.
+            // This ensures the modem can recover from the re-activation defect.
+            if (!apn_workaround_pending) {
+                SetApnContext();
+                ret = Network_StartActive(NetContextArr[0]); // real APN
+                apn_workaround_pending = true;
+            } else {
+                LOGW("Trying to activate dummy APN to workaround re-activation defect");
+                apn_workaround_pending = false;
+                ret = Network_StartActive(NetContextArr[1]); // dummy
+            }
+            if (!ret)
+                LOGE("Failed to activate APN");
+        }
+    }
+    return true;
 }

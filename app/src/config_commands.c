@@ -2,9 +2,13 @@
 #include <stdlib.h>
 
 #include <api_fs.h>
-#include <api_info.h>
+#include <api_sms.h>
+#include <api_network.h>
 #include <api_hal_pm.h>
 
+#include "gps_parse.h"
+#include "system.h"
+#include "network.h"
 #include "gps_tracker.h"
 #include "config_store.h"
 #include "config_commands.h"
@@ -23,6 +27,11 @@ void HandleGetCommand(char*);
 void HandleTailCommand(char*);
 void HandleRestartCommand(char*);
 void HandleNetworkActivateCommand(char*);
+void HandleNetworkStatusCommand(char*);
+void HandleLocationCommand(char*);
+void HandleSmsCommand(char*);
+void HandleSmsLsCommand(char*);
+void HandleSmsRmCommand(char*);
 
 struct uart_cmd_entry {
     const char* cmd;
@@ -39,9 +48,15 @@ static struct uart_cmd_entry uart_cmd_table[] = {
     {"ls",           2, HandleLsCommand,              "ls [path]",           "List files in specified folder (default: /)"},
     {"rm",           2, HandleRemoveFileCommand,      "rm <file>",           "Remove file at specified path"},
     {"tail",         4, HandleTailCommand,            "tail <file> [bytes]", "Print last [bytes] of file (default: 500 bytes)"},
+    {"net activate",12, HandleNetworkActivateCommand, "net activate",        "Activate (attach and activate) the network"},
+    {"net status",  10, HandleNetworkStatusCommand,   "net status",          "Print network status"},
+    {"sms ls",       6, HandleSmsLsCommand,           "sms ls <all|read|unread>", "list SMS messages ()"},
+    {"sms rm",       6, HandleSmsRmCommand,           "sms rm <index|all>",  "remove SMS message (rm <index>) or remove all messages (rm all)"},
+    {"sms",          3, HandleSmsCommand,             "sms",                 "Show SMS storage info (default)"},
+    {"location",     8, HandleLocationCommand,        "location",            "Show the last known GPS position"},
     {"restart",      7, HandleRestartCommand,         "restart",             "Restart the system immediately"},
-    {"netactivate", 11, HandleNetworkActivateCommand, "netactivate",         "Activate (attach and activate) the network"}
 };
+
 
 void HandleSetCommand(char* param)
 {
@@ -222,21 +237,85 @@ void HandleTailCommand(char* args)
     API_FS_Close(fd);
 }
 
-void HandleRestartCommand(char* args)
+void HandleLocationCommand(char* param)
 {
-    UART_Printf("System restarting...\r\n");
-    PM_Restart();
+    GPS_Info_t* gpsInfo = Gps_GetInfo();
+    
+    // First check if GPS is active
+    if (!IS_GPS_STATUS_ON()) {
+        UART_Printf("GPS is not active.\r\n");
+        return;
+    }
+
+    UART_Printf("Satellites visible: %d, tracked: %d\r\n", 
+                gpsInfo->gsv[0].total_sats, 
+                gpsInfo->gga.satellites_tracked);    
+    
+    if (!gpsInfo->rmc.valid)
+        UART_Printf("No valid GPS fix available.\r\n");
+
+    // Convert NMEA coordinates (DDMM.MMMM format) to decimal degrees
+    float latitude = minmea_tocoord(&gpsInfo->rmc.latitude);
+    float longitude = minmea_tocoord(&gpsInfo->rmc.longitude);
+    
+    // Format and display GPS information
+    UART_Printf("GPS Position:\r\n");
+    UART_Printf("  Date:        %02d.%02d.%02d\r\n", gpsInfo->rmc.date.year, gpsInfo->rmc.date.month, gpsInfo->rmc.date.day);
+    UART_Printf("  Time:        %02d.%02d.%02d\r\n", gpsInfo->rmc.time.hours, gpsInfo->rmc.time.minutes, gpsInfo->rmc.time.seconds);
+    UART_Printf("  Latitude:    %.6f° %c\r\n", fabs(latitude), (latitude >= 0) ? 'N' : 'S');
+    UART_Printf("  Longitude:   %.6f° %c\r\n", fabs(longitude), (longitude >= 0) ? 'E' : 'W');
+    UART_Printf("  Altitude:    %.1f meters\r\n", gpsInfo->gga.altitude);
+    UART_Printf("  Speed:       %.1f km/h\r\n", minmea_tofloat(&gpsInfo->rmc.speed) * 1.852); // Convert knots to km/h
+    UART_Printf("  Course:      %.1f°\r\n", minmea_tofloat(&gpsInfo->rmc.course));
+    UART_Printf("  Fix quality: %d\r\n", gpsInfo->gga.fix_quality);
+    UART_Printf("  HDOP: %.1f\r\n", minmea_tofloat(&gpsInfo->gsa[0].hdop));
+
+    return;
 }
 
-bool AttachActivate();
+void HandleNetworkStatusCommand(char* param)
+{
+    UART_Printf("GSM Network registered: %s, active: %s\r\n",
+                IS_GSM_REGISTERED() ? "true" : "false",
+                IS_GSM_ACTIVE() ? "true" : "false");
+    
+    // Get and display IP address if network is active
+    if (IS_GSM_ACTIVE()) {
+        char ip_address[16] = {0};
+        if (Network_GetIp(ip_address, sizeof(ip_address))) {
+            UART_Printf("IP address: %s\r\n", ip_address);
+        } else {
+            UART_Printf("Failed to get IP address\r\n");
+        }
+    } else {
+        UART_Printf("IP address: not available\r\n");
+    }
+
+    if (g_cellInfo[0] != 0) {
+        UART_Printf("Cell info: %s\r\n", g_cellInfo);
+        // Try to parse and print cell info fields if present
+        int mcc = 0, mnc = 0, lac = 0, cellid = 0, rxlev = 0;
+        if (sscanf(g_cellInfo, "%3d,%3d,%d,%d,%d", &mcc, &mnc, &lac, &cellid, &rxlev) == 5) {
+            UART_Printf("  MCC: %03d\r\n  MNC: %03d\r\n  LAC: %d\r\n  CellID: %d\r\n  RxLev: %d\r\n",
+                mcc, mnc, lac, cellid, rxlev);
+        }
+    } else
+        UART_Printf("Cell info not available\r\n");
+}
 
 void HandleNetworkActivateCommand(char* param)
 {
-    if (AttachActivate()) {
+    if (NetworkAttachActivate()) {
         UART_Printf("Network activated.\r\n");
     } else {
         UART_Printf("Network activation failed.\r\n");
     }
+}
+
+void HandleRestartCommand(char* args)
+{
+    UART_Printf("System restarting...\r\n");
+    PM_Restart();
 }
 
 void HandleHelpCommand(char* args)
@@ -245,12 +324,88 @@ void HandleHelpCommand(char* args)
     for (unsigned i = 0; i < sizeof(uart_cmd_table)/sizeof(uart_cmd_table[0]); ++i) {
         UART_Printf("  %-24s- %s\r\n", uart_cmd_table[i].syntax, uart_cmd_table[i].help);
     }
-    UART_Printf("\r\n  <param> is one of:\r\n");
+    UART_Printf("\r\n<param> is one of:\r\n  ");
     for (size_t i = 0; i < g_config_map_size; ++i) {
-        UART_Printf("    %s\r\n", g_config_map[i].param_name);
+        UART_Printf("%s, ", g_config_map[i].param_name);
+    }
+    UART_Printf("\r\n");
+}
+
+void HandleSmsCommand(char* param)
+{
+    param = trim_whitespace(param);
+    if (*param != '\0') {
+        UART_Printf("Unknown sms command parameter\r\n");
+        return;
+    }
+    // Print all SMS storage info
+    SMS_Storage_Info_t info;
+    if (!SMS_GetStorageInfo(&info, SMS_STORAGE_SIM_CARD)) {
+        UART_Printf("Failed to get SMS storage info.\r\n");
+        return;
+    }
+    UART_Printf("SMS Storage Info (SIM):\r\n");
+    UART_Printf("  Used: %d\r\n", info.used);
+    UART_Printf("  Total: %d\r\n", info.total);
+    UART_Printf("  Unread: %d\r\n", info.unReadRecords);
+    UART_Printf("  Read: %d\r\n", info.readRecords);
+    UART_Printf("  Sent: %d\r\n", info.sentRecords);
+    UART_Printf("  Unsent: %d\r\n", info.unsentRecords);
+    UART_Printf("  Unknown: %d\r\n", info.unknownRecords);
+    UART_Printf("  Storage ID: %d\r\n", info.storageId);
+    return;
+}
+
+void HandleSmsLsCommand(char* param)
+{
+    SMS_Status_t status;
+    param = trim_whitespace(param);
+    if ((*param == '\0') || (strncmp(param, "all", 3) == 0)) {
+        status = SMS_STATUS_ALL;
+    }  else if (strncmp(param, "read", 4) == 0) {
+        status = SMS_STATUS_READ;
+    } else if (strncmp(param, "unread", 6) == 0) {
+        status = SMS_STATUS_UNREAD;
+    } else {
+        UART_Printf("Unknown sms ls parameter. Use 'all', 'read', or 'unread'\r\n");
+        return;
+    }
+    if (!SMS_ListMessageRequst(status, SMS_STORAGE_SIM_CARD)) {
+        UART_Printf("Failed to request SMS list\r\n");
+    }
+    return;
+}
+
+void HandleSmsRmCommand(char* param)
+{
+    param = trim_whitespace(param);
+    if (*param != '\0') {
+        UART_Printf("incorrect parameter\r\n");
+        return;
+    }
+    int idx = atoi(param);
+    if (idx < 0) {
+        UART_Printf("Invalid index.\r\n");
+        return;
+    }
+    if (SMS_DeleteMessage(idx, SMS_STATUS_ALL, SMS_STORAGE_SIM_CARD)) {
+        UART_Printf("Deleted SMS at index %d\r\n", idx);
+    } else {
+        UART_Printf("Failed to delete SMS at index %d\r\n", idx);
     }
 }
 
+// Print SMS list message
+void HandleSmsListEvent(SMS_Message_Info_t* msg)
+{
+    UART_Printf("\r\n[SMS index: %d]\r\nFrom: %s\r\nTime: %u/%02u/%02u,%02u:%02u:%02u+%02d\r\nContent: %.*s\r\n\r\n",
+                msg->index,
+                msg->phoneNumber,
+                msg->time.year, msg->time.month, msg->time.day,
+                msg->time.hour, msg->time.minute, msg->time.second,
+                msg->time.timeZone,
+                msg->dataLen, msg->data ? (char*)msg->data : "");
+}
 
 void HandleUartCommand(char* cmd)
 {

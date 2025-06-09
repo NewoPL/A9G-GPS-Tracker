@@ -2,12 +2,13 @@
 #define SYSTEM_H
 
 typedef enum {
-    STATUS_INITIALIZED  = 1 << 0,
-    STATUS_GPS_ON       = 1 << 1,
-    STATUS_GPS_FIX      = 1 << 2,
-    STATUS_GSM_ON       = 1 << 3,
-    STATUS_CHARGING     = 1 << 4,
-    STATUS_SLEEPING     = 1 << 5
+    STATUS_INITIALIZED    = 1 << 0,
+    STATUS_GPS_ON         = 1 << 1,
+    STATUS_GPS_FIX        = 1 << 2,
+    STATUS_GSM_ACTIVE     = 1 << 3,
+    STATUS_GSM_REGISTERED = 1 << 4,
+    STATUS_CHARGING       = 1 << 5,
+    STATUS_SLEEPING       = 1 << 6
 } StatusFlags;
 
 // Initialized
@@ -25,10 +26,15 @@ typedef enum {
 #define GPS_FIX_OFF()      (systemStatus &= ~STATUS_GPS_FIX)
 #define IS_GPS_FIX()       (systemStatus & STATUS_GPS_FIX)
 
-// GSM
-#define GSM_STATUS_ON()    (systemStatus |= STATUS_GSM_ON)
-#define GSM_STATUS_OFF()   (systemStatus &= ~STATUS_GSM_ON)
-#define IS_GSM_STATUS_ON() (systemStatus & STATUS_GSM_ON)
+// GSM Active
+#define GSM_ACTIVE_ON()    (systemStatus |= STATUS_GSM_ACTIVE)
+#define GSM_ACTIVE_OFF()   (systemStatus &= ~STATUS_GSM_ACTIVE)
+#define IS_GSM_ACTIVE()    (systemStatus & STATUS_GSM_ACTIVE)
+
+// GSM Registered
+#define GSM_REGISTERED_ON()   (systemStatus |= STATUS_GSM_REGISTERED)
+#define GSM_REGISTERED_OFF()  (systemStatus &= ~STATUS_GSM_REGISTERED)
+#define IS_GSM_REGISTERED()   (systemStatus & STATUS_GSM_REGISTERED)
 
 // Charging
 #define CHARGING_ON()      (systemStatus |= STATUS_CHARGING)
@@ -42,5 +48,8 @@ typedef enum {
 
 // The actual bitfield variable
 extern uint8_t systemStatus;
+extern uint8_t g_RSSI;
+extern float   g_last_latitude;
+extern float   g_last_longitude;
 
 #endif
