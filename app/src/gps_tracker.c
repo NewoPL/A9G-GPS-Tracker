@@ -134,8 +134,9 @@ void gps_trackerTask(void *pData)
                 const char* serverName = g_ConfigStore.server_addr;
                 const char* serverPort = g_ConfigStore.server_port;
                 bool secure = (g_ConfigStore.server_protocol == PROT_HTTPS);
-                if (Http_Post(secure, serverName, serverPort, "/", requestBuffer, strlen(requestBuffer), responseBuffer, sizeof(responseBuffer)) < 0)
-                    LOGE("FAILED to send the location to the server");
+                int result = Http_Post(secure, serverName, serverPort, "/", requestBuffer, strlen(requestBuffer), responseBuffer, sizeof(responseBuffer));
+                if ( result < 0)
+                    LOGE("FAILED to send the location to the server. err: %d", result);
                 else
                     LOGI("Sent location to %s://%s:%s", (secure ? "https":"http"), serverName,serverPort);
             }

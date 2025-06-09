@@ -1,9 +1,6 @@
 #ifndef NETWORK_H
 #define NETWORK_H
 
-#define SSL_WRITE_TIMEOUT 5000
-#define SSL_READ_TIMEOUT  5000
-
 /*
  * @brief Global variable to store cell information.
  *
