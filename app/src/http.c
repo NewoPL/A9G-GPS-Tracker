@@ -3,6 +3,7 @@
 
 #include <api_os.h>
 #include <api_socket.h>
+#include <api_hal_uart.h>
 #include <api_ssl.h>
 
 #include "http.h"
@@ -153,45 +154,49 @@ static inline int https_send_receive(SSL_Config_t *sslConfig,
 
     error = SSL_Init(sslConfig);
     if(error != SSL_ERROR_NONE) {
-        LOGD("SSL init error: %d", error);
+        LOGI("SSL init error: %d", error);
         return error;
     }
 
+    UART_Write(UART1,"[",1);
     // Connect to server
     error = SSL_Connect(sslConfig, hostName, port);
     if(error != SSL_ERROR_NONE) {
-        LOGD("SSL connect error: %d", error);
+        LOGI("SSL connect error: %d", error);
         goto err_ssl_destroy;
     }
 
+    UART_Write(UART1,"w",1);
     // Send package
     error = SSL_Write(sslConfig, buffer, bufferLen, SSL_WRITE_TIMEOUT);
     if(error <= 0) {
-        LOGD("SSL Write error: %d", error);
+        LOGI("SSL Write error: %d", error);
         goto err_ssl_close;
     }
 
+    UART_Write(UART1,"r",1);
     // Read response
     memset(retBuffer, 0, retBufferSize);
     error = SSL_Read(sslConfig, retBuffer, retBufferSize, SSL_READ_TIMEOUT);
     if(error < 0) {
-        LOGD("SSL Read error: %d", error);
+        LOGI("SSL Read error: %d", error);
         goto err_ssl_close;
     }
     if(error == 0) {
-        LOGD("SSL no receive response");
+        LOGI("SSL no receive response");
         error = SSL_ERROR_INTERNAL;
         goto err_ssl_close;
     }
 
 err_ssl_close:
+    UART_Write(UART1,"]",1);
     if (SSL_Close(sslConfig) != SSL_ERROR_NONE) {
-        LOGD("SSL close error: %d", error);
+        LOGI("SSL close error: %d", error);
     }
 
 err_ssl_destroy:
     if (SSL_Destroy(sslConfig) != SSL_ERROR_NONE) {
-        LOGD("SSL destroy error: %d", error);
+        LOGI("SSL destroy error: %d", error);
     }
 
     return error;
