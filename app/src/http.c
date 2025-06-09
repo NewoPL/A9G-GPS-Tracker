@@ -157,9 +157,18 @@ static inline int https_send_receive(const char   *hostName,
         return error;
     }
 
+        // Resolve IP address from hostname
+    char IPAddr[INET_ADDRSTRLEN];
+    memset(IPAddr, 0, sizeof(IPAddr));
+    if(DNS_GetHostByName2(hostName, IPAddr) != 0) {
+        LOGI("Cannot resolve the hostName name");
+        return SSL_ERROR_INTERNAL;
+    }
+    LOGD("Resolved IP for %s -> %s", hostName, IPAddr);
+    
     UART_Write(UART1,"[",1);
-    // Connect to server
-    error = SSL_Connect(&SSLconfig, hostName, port);
+    // Connect to server using IP address
+    error = SSL_Connect(&SSLconfig, IPAddr, port);
     if(error != SSL_ERROR_NONE) {
         LOGI("SSL connect error: %d", error);
         goto err_ssl_destroy;
