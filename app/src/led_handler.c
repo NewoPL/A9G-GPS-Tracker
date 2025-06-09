@@ -1,6 +1,8 @@
 #include <api_os.h>
 #include <api_hal_gpio.h>
+
 #include "system.h"
+#include "gps_tracker.h"
 #include "led_handler.h"
 
 static GPIO_config_t gpioLedGps = {
@@ -41,7 +43,7 @@ void LED_Blink(void* param)
     if (taskHandle == NULL) return;
 
     if (IS_INITIALIZED()) {
-        handle_led_blink(IS_GPS_FIX(), count, GPS_STATUS_LED);
+        handle_led_blink(gps_isValid(), count, GPS_STATUS_LED);
         handle_led_blink(IS_GSM_ACTIVE(), count, GSM_STATUS_LED);
         count = (count + 1) % 5;
     } else {

@@ -17,6 +17,26 @@
 #include "utils.h"
 #include "debug.h"
 
+float gps_GetLastLatitude(void)
+{
+    GPS_Info_t* gpsInfo = Gps_GetInfo();
+    return minmea_tocoord(&gpsInfo->rmc.latitude);
+}
+
+float gps_GetLastLongitude(void)
+{
+    GPS_Info_t* gpsInfo = Gps_GetInfo();
+    return minmea_tocoord(&gpsInfo->rmc.longitude);
+}
+
+bool  gps_isValid(void) 
+{
+    GPS_Info_t* gpsInfo = Gps_GetInfo();
+    return gpsInfo->rmc.valid && 
+           (gpsInfo->rmc.latitude.scale != 0) && 
+           (gpsInfo->rmc.longitude.scale != 0);
+}
+
 uint8_t requestBuffer[400];
 uint8_t responseBuffer[1024];
 
@@ -67,18 +87,18 @@ void gps_trackerTask(void *pData)
     {
         GPS_Info_t* gpsInfo = Gps_GetInfo();
         uint32_t    loop_start = time(NULL);
-        if(IS_GPS_STATUS_ON()) // && (IS_GPS_FIX()))
+        if(IS_GPS_STATUS_ON()) // && gps_isValid)
         {
             time_t gps_timestamp = mk_time(&gpsInfo->rmc.date, &gpsInfo->rmc.time);
-            
+
+            float latitude  = minmea_tocoord(&gpsInfo->rmc.latitude);
+            float longitude = minmea_tocoord(&gpsInfo->rmc.longitude);
             // convert other data a floating point 
             float speed     = minmea_tofloat(&gpsInfo->rmc.speed);
             float bearing   = minmea_tofloat(&gpsInfo->rmc.course);
             float altitude  = minmea_tofloat(&gpsInfo->gga.altitude);
-            float accuracy0 = minmea_tofloat(&gpsInfo->gsa[0].hdop);
-
-            float gps_uere = g_ConfigStore.gps_uere;
-            float accuracy = gps_uere * accuracy0;
+            float accuracy  = minmea_tofloat(&gpsInfo->gsa[0].hdop) * 
+                              g_ConfigStore.gps_uere; // User Equivalent Range Error (UERE) in meters 
 
             uint8_t percent;
             PM_Voltage(&percent);
@@ -106,7 +126,7 @@ void gps_trackerTask(void *pData)
 
             snprintf(requestBuffer, sizeof(requestBuffer),
                      "id=%s&valid=%d&timestamp=%d&lat=%f&lon=%f&speed=%1.f&bearing=%.1f&altitude=%.1f&accuracy=%.1f%s&batt=%d",
-                     device_name, gpsInfo->rmc.valid, gps_timestamp, g_last_latitude, g_last_longitude, speed, bearing, altitude, accuracy, responseBuffer, percent);
+                     device_name, gpsInfo->rmc.valid, gps_timestamp, latitude, longitude, speed, bearing, altitude, accuracy, responseBuffer, percent);
             requestBuffer[sizeof(requestBuffer) - 1] = '\0';
 
             if(IS_GSM_ACTIVE())
@@ -114,8 +134,9 @@ void gps_trackerTask(void *pData)
                 const char* serverName = g_ConfigStore.server_addr;
                 const char* serverPort = g_ConfigStore.server_port;
                 bool secure = (g_ConfigStore.server_protocol == PROT_HTTPS);
-                if (Http_Post(secure, serverName, serverPort, "/", requestBuffer, strlen(requestBuffer), responseBuffer, sizeof(responseBuffer)) < 0)
-                    LOGE("FAILED to send the location to the server");
+                int result = Http_Post(secure, serverName, serverPort, "/", requestBuffer, strlen(requestBuffer), responseBuffer, sizeof(responseBuffer));
+                if ( result < 0)
+                    LOGE("FAILED to send the location to the server. err: %d", result);
                 else
                     LOGI("Sent location to %s://%s:%s", (secure ? "https":"http"), serverName,serverPort);
             }

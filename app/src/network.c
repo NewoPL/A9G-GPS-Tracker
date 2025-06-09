@@ -11,7 +11,8 @@
 #include "network.h"
 #include "debug.h"
 
-char                         g_cellInfo[128] = "\0";
+uint8_t g_RSSI = 0;
+char    g_cellInfo[128] = "\0";
 static Network_Status_t      g_NetworkStatus = 0;
 static Network_PDP_Context_t NetContextArr[2]; // Two-element array: [0]=real APN, [1]=dummy APN
 static bool apn_workaround_pending = false;  

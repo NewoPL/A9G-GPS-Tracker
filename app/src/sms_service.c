@@ -50,12 +50,14 @@ void SMSInit()
 // Helper to get last known position as Google Maps link
 static bool GetGoogleMapsLink(char* buf, size_t bufsize)
 {
-    if (g_last_latitude == 0.0f && g_last_longitude == 0.0f)
+    float latitude = gps_GetLastLatitude();
+    float longitude = gps_GetLastLongitude();
+    if (latitude == 0.0f && longitude == 0.0f)
         return false;
     
     // Format with proper precision for Google Maps link
     snprintf(buf, bufsize, "https://maps.google.com/?q=%.6f,%.6f",
-             g_last_latitude, g_last_longitude);
+             latitude, longitude);
     return true;
 }
 

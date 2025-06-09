@@ -33,10 +33,6 @@ HANDLE  appMainTaskHandle = NULL;
 
 uint8_t systemStatus = 0;
 
-uint8_t g_RSSI = 0;
-float   g_last_latitude  = 0.0f;
-float   g_last_longitude = 0.0f;
-
 static void EventHandler(API_Event_t* pEvent)
 {
     switch(pEvent->id)
@@ -83,6 +79,7 @@ static void EventHandler(API_Event_t* pEvent)
         case API_EVENT_ID_NETWORK_DEACTIVED:
             GSM_ACTIVE_OFF(); 
             LOGE("network deactived");
+            NetworkAttachActivate();
             break;
 
         case API_EVENT_ID_NETWORK_ATTACH_FAILED:
@@ -119,19 +116,8 @@ static void EventHandler(API_Event_t* pEvent)
         case API_EVENT_ID_GPS_UART_RECEIVED:
             if (g_ConfigStore.gps_logging)
                 LOGD("received GPS data, length:%d, data:\r\n%s",pEvent->param1,pEvent->pParam1);
-
             GPS_STATUS_ON();
             GPS_Update(pEvent->pParam1, pEvent->param1);
-
-            GPS_Info_t* gpsInfo = Gps_GetInfo();
-            g_last_latitude = minmea_tocoord(&gpsInfo->rmc.latitude);
-            g_last_longitude = minmea_tocoord(&gpsInfo->rmc.longitude);
-
-            if (gpsInfo->rmc.valid) {
-                GPS_FIX_ON();
-            } else {
-                GPS_FIX_OFF();
-            }
 
             break;
         
@@ -190,7 +176,7 @@ void app_MainTask(void *pData)
             OS_Free(event->pParam1);
             OS_Free(event->pParam2);
             OS_Free(event);
-            OS_SleepUs(0);
+            OS_Sleep(1); // Yield to other tasks
         }
     }
 }
