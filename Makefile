@@ -13,7 +13,6 @@ LOCAL_MODULE_DEPENDS += libs
 ##################################################################################
 
 PROJECT_PATH += app
-PROJECT_PATH += app
 
 LOCAL_MODULE_DEPENDS += ${PROJECT_PATH}
 
