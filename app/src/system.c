@@ -164,7 +164,7 @@ void app_MainTask(void *pData)
     SMSInit();
 
     trackerTaskHandle = OS_CreateTask(
-        gps_trackerTask, NULL, NULL,
+        gps_TrackerTask, NULL, NULL,
         TRACKER_TASK_STACK_SIZE,
         TRACKER_TASK_PRIORITY, 
         0, 0, TRACKER_TASK_NAME);

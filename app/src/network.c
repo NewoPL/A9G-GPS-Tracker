@@ -14,17 +14,17 @@
 
 uint8_t g_RSSI = 0;
 char    g_cellInfo[128] = "\0";
-static Network_Status_t      g_NetworkStatus = 0;
+static Network_Status_t g_NetworkStatus = 0;
 static Network_PDP_Context_t NetContextArr[2]; // Two-element array: [0]=real APN, [1]=dummy APN
 static bool apn_workaround_pending = false;  
 
-static void Network_SetCellInfoTimer(HANDLE);
+static void NetworkMonitorTimer(HANDLE);
 
-void NetworkCellInfoGet(void* param)
+void NetworkMonitor(void* param)
 {
     if (param == NULL) return;
 
-    if (g_trackerloop_tick > 0)
+    if (IS_GSM_ACTIVE() && (g_trackerloop_tick > 0))
     {
         uint32_t now = time(NULL);
         if (now - g_trackerloop_tick > 150000) {
@@ -42,7 +42,12 @@ void NetworkCellInfoGet(void* param)
         g_cellInfo[0] = '\0';
     }
     HANDLE taskHandle = (HANDLE)param;
-    Network_SetCellInfoTimer(taskHandle);
+    NetworkMonitorTimer(taskHandle);
+}
+
+static void NetworkMonitorTimer(HANDLE taskHandle)
+{  
+    OS_StartCallbackTimer(taskHandle, 15000, NetworkMonitor, (void*)taskHandle);
 }
 
 void NetworkCellInfoCallback(Network_Location_t* loc, int number)
@@ -51,11 +56,6 @@ void NetworkCellInfoCallback(Network_Location_t* loc, int number)
     if (number <= 0) return;
     snprintf(g_cellInfo,  sizeof(g_cellInfo), "%u%u%u,%u%u%u,%u,%u,%d",
              loc->sMcc[0], loc->sMcc[1], loc->sMcc[2], loc->sMnc[0], loc->sMnc[1], loc->sMnc[2], loc->sLac, loc->sCellID, loc->iRxLev);
-}
-
-static void Network_SetCellInfoTimer(HANDLE taskHandle)
-{  
-    OS_StartCallbackTimer(taskHandle, 15000, NetworkCellInfoGet, (void*)taskHandle);
 }
 
 // OS Calls this function whenever the network state changes
@@ -106,7 +106,7 @@ void NetworkInit(HANDLE taskHandle)
     memset(&NetContextArr[1], 0, sizeof(NetContextArr[1]));
     strncpy(NetContextArr[1].apn, "dummy_apn", sizeof(NetContextArr[1].apn)-1);
 
-    Network_SetCellInfoTimer(taskHandle);
+    NetworkMonitorTimer(taskHandle);
 
     return;
 }

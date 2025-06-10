@@ -95,7 +95,7 @@ uint32_t g_trackerloop_tick = 0;
 uint8_t  requestBuffer[400];
 uint8_t  responseBuffer[1024];
 
-void gps_trackerTask(void *pData)
+void gps_TrackerTask(void *pData)
 {
     while (!IS_INITIALIZED() || !IS_GSM_ACTIVE()) OS_Sleep(2000);
 
