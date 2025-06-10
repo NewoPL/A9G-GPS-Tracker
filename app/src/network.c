@@ -31,6 +31,8 @@ void NetworkMonitor(void* param)
             LOGE("gps_tracker watchdog: loop stuck, deactivating network!");
             Network_StartDeactive(1);
         }
+    } else if (g_trackerloop_tick > 0) {
+        NetworkAttachActivate();
     }
 
     if (IS_GSM_REGISTERED()) {
@@ -58,25 +60,59 @@ void NetworkCellInfoCallback(Network_Location_t* loc, int number)
              loc->sMcc[0], loc->sMcc[1], loc->sMcc[2], loc->sMnc[0], loc->sMnc[1], loc->sMnc[2], loc->sLac, loc->sCellID, loc->iRxLev);
 }
 
-// OS Calls this function whenever the network state changes
+// the function is called whenever the network state changes
 void NetworkUpdateStatus(Network_Status_t status)
 {
-    const char* status_str = "UNKNOWN";
     switch (status) {
-        case NETWORK_STATUS_OFFLINE:        status_str = "OFFLINE"; break;
-        case NETWORK_STATUS_REGISTERING:    status_str = "REGISTERING"; break;
-        case NETWORK_STATUS_REGISTERED:     status_str = "REGISTERED"; break;
-        case NETWORK_STATUS_DETACHED:       status_str = "DETACHED"; break;
-        case NETWORK_STATUS_ATTACHING:      status_str = "ATTACHING"; break;
-        case NETWORK_STATUS_ATTACHED:       status_str = "ATTACHED"; break;
-        case NETWORK_STATUS_DEACTIVED:      status_str = "DEACTIVED"; break;
-        case NETWORK_STATUS_ACTIVATING:     status_str = "ACTIVATING"; break;
-        case NETWORK_STATUS_ACTIVATED:      status_str = "ACTIVATED"; break;
-        case NETWORK_STATUS_ATTACH_FAILED:  status_str = "ATTACH_FAILED"; break;
-        case NETWORK_STATUS_ACTIVATE_FAILED:status_str = "ACTIVATE_FAILED"; break;
-        default:                            status_str = "INVALID"; break;
+        case NETWORK_STATUS_OFFLINE:        
+            LOGE("network offline");
+            break;
+        case NETWORK_STATUS_REGISTERING:
+            LOGI("state: registering to the network");
+            GSM_REGISTERED_OFF();
+            break;
+        case NETWORK_STATUS_REGISTERED:     
+            LOGW("state: network registered successfully");
+            GSM_REGISTERED_ON();
+            NetworkAttachActivate();
+            break;
+        case NETWORK_STATUS_DETACHED:
+            LOGW("state: network detached");
+            GSM_ACTIVE_OFF();
+            break;
+        case NETWORK_STATUS_ATTACHING:
+            LOGI("state: attaching to the network");
+            GSM_ACTIVE_OFF();
+            break;
+        case NETWORK_STATUS_ATTACHED:       
+            LOGW("state: network attached successfully");
+            GSM_ACTIVE_OFF(); 
+            NetworkAttachActivate();    
+            break;
+        case NETWORK_STATUS_DEACTIVED:      
+            LOGE("state: network deactived");
+            GSM_ACTIVE_OFF(); 
+            NetworkAttachActivate();
+            break;
+        case NETWORK_STATUS_ACTIVATING:
+            LOGW("state: activating the network");
+            GSM_ACTIVE_OFF(); 
+            break;        
+        case NETWORK_STATUS_ACTIVATED:
+            LOGW("state: network activated successfully");
+            GSM_ACTIVE_ON();
+            break;
+        case NETWORK_STATUS_ATTACH_FAILED: 
+            LOGE("state: network attach failed");
+            GSM_ACTIVE_OFF(); 
+            break;
+        case NETWORK_STATUS_ACTIVATE_FAILED:
+            LOGE("state: network activation failed");
+            break;
+
+        default:
+            break;
     }
-    LOGI("[Network] UpdateStatus called with status=%d (%s)", status, status_str);
     g_NetworkStatus = status;
 }
 
@@ -125,9 +161,10 @@ bool NetworkAttachActivate()
 {
     uint8_t status;
     if (!IS_GSM_REGISTERED()) {
-        LOGE("network not registered");
+        LOGE("Activation skipped. Network not registered");
         return false;
     }
+
     bool ret = Network_GetAttachStatus(&status);
     if(!ret)
     {
@@ -136,41 +173,48 @@ bool NetworkAttachActivate()
     }
     if(!status)
     {
+        NetworkUpdateStatus(NETWORK_STATUS_ATTACHING);
         ret = Network_StartAttach();
-        LOGI("attaching to the network");
         if(!ret)
         {
             LOGE("network attach failed");
             return false;
         }
+        return true;
     }
-    else
-    {
-        ret = Network_GetActiveStatus(&status);
-        if(!ret)
-        {
-            LOGE("get activate status failed");
-            return false;
-        }
-        if(!status)
-        {
-            LOGI("activating the network");
 
-            // Implements the APN re-activation workaround:
-            // - If workaround is pending, activate the real APN (NetContextArr[0]) and clear the flag.
-            // - Otherwise, activate the dummy APN (NetContextArr[1]) and set the flag.
-            // This ensures the modem can recover from the re-activation defect.
-            if (!apn_workaround_pending) {
-                SetApnContext();
-                ret = Network_StartActive(NetContextArr[0]); // real APN
-                apn_workaround_pending = true;
-            } else {
-                LOGW("Trying to activate dummy APN to workaround re-activation defect");
-                apn_workaround_pending = false;
-                ret = Network_StartActive(NetContextArr[1]); // dummy
-            }
-            if (!ret)
-                LOGE("Failed to activate APN");
+    if (NetworkGetStatus() == NETWORK_STATUS_ACTIVATING)
+    {
+        LOGW("Activation skipped as it is already in progress");
+        return false;
+    }
+    ret = Network_GetActiveStatus(&status);
+    if(!ret)
+    {
+        LOGE("Get activate status failed");
+        return false;
+    }
+    if (!status)
+    {
+        // Implements the APN re-activation workaround:
+        // - If workaround is pending, activate the real APN (NetContextArr[0]) and clear the flag.
+        // - Otherwise, activate the dummy APN (NetContextArr[1]) and set the flag.
+        // This ensures the modem can recover from the re-activation defect.
+        if (!apn_workaround_pending) {
+            LOGI("Using valid APN to activate the network");
+            SetApnContext();
+            NetworkUpdateStatus(NETWORK_STATUS_ACTIVATING);
+            ret = Network_StartActive(NetContextArr[0]); // real APN
+            apn_workaround_pending = true;
+        } else {
+            LOGI("Using dummy APN to workaround re-activation defect");
+            NetworkUpdateStatus(NETWORK_STATUS_ACTIVATING);
+            ret = Network_StartActive(NetContextArr[1]); // dummy
+            apn_workaround_pending = false;
+        }
+        if (!ret) {
+            LOGE("Failed to activate APN");
+            return false;
         }
     }
     return true;
