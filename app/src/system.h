@@ -6,7 +6,7 @@ typedef enum {
     STATUS_GPS_ON         = 1 << 1,
     STATUS_GSM_ACTIVE     = 1 << 2,
     STATUS_GSM_REGISTERED = 1 << 3,
-    STATUS_SLEEPING       = 1 << 8
+    STATUS_SLEEPING       = 1 << 4
 } StatusFlags;
 
 // Initialized

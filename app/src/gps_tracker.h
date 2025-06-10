@@ -19,7 +19,7 @@
 /**
  * @brief Timestamp of the last tracker loop tick
  * It is set to the timestamp of the last GPS update update loop cycle in gps_trackerTask()
- * it is used to keep even spaces beetween GPS updates
+ * it is used to keep even spaces between GPS updates
  * network module uses it to detect if the GPS tracker is stuck on connect function
  * and if so it will try to reactivate GPRS connection
  */ 
