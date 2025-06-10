@@ -17,6 +17,8 @@
 #include "utils.h"
 #include "debug.h"
 
+#define MODULE_TAG "Config"
+
 typedef void (*UartCmdHandler)(char*);
 
 void HandleHelpCommand(char*);
