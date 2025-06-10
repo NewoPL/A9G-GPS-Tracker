@@ -1,8 +1,8 @@
 #ifndef HTTP_H
 #define HTTP_H
 
-#define SSL_WRITE_TIMEOUT 5000
-#define SSL_READ_TIMEOUT  2000
+#define SSL_WRITE_TIMEOUT 3000
+#define SSL_READ_TIMEOUT  3000
 
 /**
  * @brief Sends an HTTP/HTTPs POST request to the specified server.

@@ -5,6 +5,7 @@
 
 #include <api_os.h>
 #include <api_network.h>
+#include <api_hal_uart.h>
 
 #include "system.h"
 #include "gps_tracker.h"
@@ -26,15 +27,17 @@ void NetworkMonitor(void* param)
 {
     if (param == NULL) return;
 
-    if (IS_GSM_ACTIVE() && (g_trackerloop_tick > 0))
-    {
-        uint32_t now = time(NULL);
-        if (now - g_trackerloop_tick > 150000) {
-            LOGE("gps_tracker watchdog: loop stuck, deactivating network!");
-            Network_StartDeactive(1);
+    if (g_trackerloop_tick > 0) {
+        if (IS_GSM_ACTIVE())
+        {
+            uint32_t now = time(NULL);
+            if (now - g_trackerloop_tick > 20) {
+                LOGE("watchdog: connection is taking too long, deactivating network!");
+                Network_StartDeactive(1);
+            }
+        } else {
+            NetworkAttachActivate();
         }
-    } else if (g_trackerloop_tick > 0) {
-        NetworkAttachActivate();
     }
 
     if (IS_GSM_REGISTERED()) {

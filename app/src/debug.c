@@ -61,17 +61,14 @@ void log_message_internal(t_logLevel level, const char *tag, const char *format,
     va_list args;
     va_start(args, format);
     vsnprintf(message, sizeof(message), format, args);
+    message[sizeof(message) - 1] = '\0';
     va_end(args);
 
-    // Get time since boot in HH:MM:SS
-    uint32_t ms = clock() / 16384;
-    uint32_t sec = ms / 1000;
-    uint32_t h = sec / 3600;
-    uint32_t m = (sec % 3600) / 60;
-    uint32_t s = sec % 60;
+    RTC_Time_t time;
+    TIME_GetRtcTime(&time);
 
     char timebuf[16];
-    snprintf(timebuf, sizeof(timebuf), "%02u:%02u:%02u", h, m, s);
+    snprintf(timebuf, sizeof(timebuf), "[%02u:%02u.%02u]", time.hour,time.minute,time.second);
 
     // Get logger output type from ConfigStore
     switch (g_ConfigStore.logOutput) {
