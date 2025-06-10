@@ -136,11 +136,16 @@ void gps_TrackerTask(void *pData)
     if(!GPS_SetOutputInterval(1000))
         LOGE("set GPS interval failed");
 
+    // Target loop period in seconds. It is set to:
+    // 10s when sending data to server 
+    // 1s when waiting for the internet connection or a GPS fix
+    uint32_t desired_interval = 0;
+    
     while(1)
     {
         g_trackerloop_tick = time(NULL);
-        
-        if(IS_GPS_STATUS_ON()) // && gps_isValid)
+
+        if(IS_GPS_STATUS_ON() && IS_GSM_ACTIVE())
         {
             uint8_t percent;
             PM_Voltage(&percent);
@@ -149,44 +154,39 @@ void gps_TrackerTask(void *pData)
 
             responseBuffer[0] = '\0';
             if (strlen(g_cellInfo) != 0) {
-                 snprintf(responseBuffer, sizeof(responseBuffer),"&cell=%s", g_cellInfo);
+                snprintf(responseBuffer, sizeof(responseBuffer),"&cell=%s", g_cellInfo);
             }
 
             snprintf(requestBuffer, sizeof(requestBuffer),
-                     "id=%s&valid=%d&timestamp=%d&lat=%f&lon=%f&speed=%1.f&bearing=%.1f&altitude=%.1f&accuracy=%.1f%s&batt=%d",
-                     g_ConfigStore.device_name, gpsInfo->rmc.valid, GpsTrackerData.timestamp,
-                     GpsTrackerData.latitude, GpsTrackerData.longitude, 
-                     GpsTrackerData.speed, GpsTrackerData.bearing, GpsTrackerData.altitude, 
-                     GpsTrackerData.accuracy, responseBuffer, percent);
+                "id=%s&valid=%d&timestamp=%d&lat=%f&lon=%f&speed=%1.f&bearing=%.1f&altitude=%.1f&accuracy=%.1f%s&batt=%d",
+                g_ConfigStore.device_name, gpsInfo->rmc.valid, 
+                GpsTrackerData.timestamp, GpsTrackerData.latitude, GpsTrackerData.longitude, 
+                GpsTrackerData.speed,     GpsTrackerData.bearing,  GpsTrackerData.altitude, 
+                GpsTrackerData.accuracy, responseBuffer, percent);
             requestBuffer[sizeof(requestBuffer) - 1] = '\0';
 
-            if(IS_GSM_ACTIVE())
-            {
-                const char* serverName = g_ConfigStore.server_addr;
-                const char* serverPort = g_ConfigStore.server_port;
-                bool secure = (g_ConfigStore.server_protocol == PROT_HTTPS);
-                int result = Http_Post(secure, serverName, serverPort, "/", 
-                                       requestBuffer, strlen(requestBuffer),
-                                       responseBuffer, sizeof(responseBuffer));
-                if (result < 0)
-                    LOGE("FAILED to send the location to the server. err: %d", result);
-                else
-                    LOGI("Sent location to %s://%s:%s", (secure ? "https":"http"), serverName, serverPort);
-            }
+            const char* serverName = g_ConfigStore.server_addr;
+            const char* serverPort = g_ConfigStore.server_port;
+            const bool  secure = (g_ConfigStore.server_protocol == PROT_HTTPS);
+            int result = Http_Post(secure, serverName, serverPort, "/", 
+                                   requestBuffer, strlen(requestBuffer),
+                                   responseBuffer, sizeof(responseBuffer));
+            if (result < 0)
+                LOGE("FAILED to send the location to the server. err: %d", result);
             else
-            {
-                LOGE("No internet registered:%d, active:%d", 
-                     IS_GSM_REGISTERED(), IS_GSM_ACTIVE());           }
+                LOGI("Sent location to %s://%s:%s", (secure ? "https":"http"), serverName, serverPort);
+            
+            // wait 10 seconds before next loop iteration
+            desired_interval = 10; 
         }
         else
         {
-            LOGE("No GPS fix. SAT visible: %d, SAT tracked:%d", 
-                 gpsInfo->gsv[0].total_sats, gpsInfo->gga.satellites_tracked);
+            // if there is no internet do not wait too long for the next loop
+            desired_interval = 1;
         }
 
         uint32_t loop_end = time(NULL);
         uint32_t loop_duration = (loop_end - g_trackerloop_tick);
-        uint32_t desired_interval = 10; // target loop period in seconds (e.g., 10 seconds)
 
         if (loop_duration > desired_interval) loop_duration = desired_interval;
         OS_Sleep((desired_interval - loop_duration) * 1000);
