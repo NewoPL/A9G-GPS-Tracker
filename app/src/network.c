@@ -54,7 +54,7 @@ void NetworkMonitor(void* param)
 
 static void NetworkMonitorTimer(HANDLE taskHandle)
 {  
-    OS_StartCallbackTimer(taskHandle, 15000, NetworkMonitor, (void*)taskHandle);
+    OS_StartCallbackTimer(taskHandle, NETWORK_MONITOR_INTERVAL_MS, NetworkMonitor, (void*)taskHandle);
 }
 
 void NetworkCellInfoCallback(Network_Location_t* loc, int number)
