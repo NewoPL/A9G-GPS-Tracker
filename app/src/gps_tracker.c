@@ -153,9 +153,8 @@ void gps_TrackerTask(void *pData)
             gps_PrintLocation();
 
             responseBuffer[0] = '\0';
-            if (strlen(g_cellInfo) != 0) {
+            if (strlen(g_cellInfo) != 0)
                 snprintf(responseBuffer, sizeof(responseBuffer),"&cell=%s", g_cellInfo);
-            }
 
             snprintf(requestBuffer, sizeof(requestBuffer),
                 "id=%s&valid=%d&timestamp=%d&lat=%f&lon=%f&speed=%1.f&bearing=%.1f&altitude=%.1f&accuracy=%.1f%s&batt=%d",
@@ -185,9 +184,7 @@ void gps_TrackerTask(void *pData)
             desired_interval = 1;
         }
 
-        uint32_t loop_end = time(NULL);
-        uint32_t loop_duration = (loop_end - g_trackerloop_tick);
-
+        uint32_t loop_duration = (time(NULL) - g_trackerloop_tick);
         if (loop_duration > desired_interval) loop_duration = desired_interval;
         OS_Sleep((desired_interval - loop_duration) * 1000);
     }
