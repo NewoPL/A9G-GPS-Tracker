@@ -1,9 +1,6 @@
 #ifndef NETWORK_H
 #define NETWORK_H
 
-#define SSL_WRITE_TIMEOUT 5000
-#define SSL_READ_TIMEOUT  5000
-
 /*
  * @brief Global variable to store cell information.
  *
@@ -47,5 +44,7 @@ Network_Status_t NetworkGetStatus(void);
  * and stores it in the global `g_cellInfo` variable.
  */
 void NetworkCellInfoCallback(Network_Location_t* loc, int number);
+
+extern uint8_t g_RSSI;
 
 #endif

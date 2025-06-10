@@ -52,7 +52,7 @@ int32_t FILE_Printf(const char* fmt, ...)
     return 0;
 }
 
-void log_message_internal(t_logLevel level, const char *func, const char *format, ...)
+void log_message_internal(t_logLevel level, const char *tag, const char *format, ...)
 {
     if (level > g_ConfigStore.logLevel || level == LOG_LEVEL_NONE)
         return;
@@ -61,18 +61,25 @@ void log_message_internal(t_logLevel level, const char *func, const char *format
     va_list args;
     va_start(args, format);
     vsnprintf(message, sizeof(message), format, args);
+    message[sizeof(message) - 1] = '\0';
     va_end(args);
+
+    RTC_Time_t time;
+    TIME_GetRtcTime(&time);
+
+    char timebuf[16];
+    snprintf(timebuf, sizeof(timebuf), "%02u:%02u.%02u", time.hour,time.minute,time.second);
 
     // Get logger output type from ConfigStore
     switch (g_ConfigStore.logOutput) {
         case LOGGER_OUTPUT_TRACE:
-            Trace(level, "[%s] %s(): %s", LogLevelSerializer(&level), func, message);
+            Trace(level, "[%s] [%s] %s\n", timebuf, tag, message);
             break;
         case LOGGER_OUTPUT_FILE:
-            FILE_Printf("[%s] %s(): %s\n", LogLevelSerializer(&level), func, message);
+            FILE_Printf("[%s] [%s] [%s] %s\n", timebuf, tag, LogLevelSerializer(&level), message);
             break;
         default:
-            UART_Printf("[%s] %s(): %s\n", LogLevelSerializer(&level), func, message);
+            UART_Printf("[%s] [%s] [%s] %s\n", timebuf, tag, LogLevelSerializer(&level), message);
             break;
     }
 }

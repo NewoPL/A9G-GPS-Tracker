@@ -106,6 +106,8 @@ void format_size(char* buf, size_t bufsize, int value, const char* label) {
 
 void FsInfoTest()
 {
+#define MODULE_TAG "System"
+
     API_FS_INFO fsInfo;
     int sizeUsed = 0, sizeTotal = 0;
     char used_buf[32], total_buf[32];
@@ -130,6 +132,8 @@ void FsInfoTest()
     format_size(used_buf, sizeof(used_buf), sizeUsed, "");
     format_size(total_buf, sizeof(total_buf), sizeTotal, "");
     LOGI("Ext Flash used: %s, total size: %s", used_buf, total_buf);
+
+#undef MODULE_TAG
 }
 
 uint8_t csq_to_percent(int csq)

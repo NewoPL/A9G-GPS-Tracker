@@ -16,6 +16,47 @@
 #define DEFAULT_LOG_LEVEL         "info"
 #define DEFAULT_LOG_OUTPUT        "uart"
 
-void gps_trackerTask(void *pData);
+/**
+ * @brief Timestamp of the last tracker loop tick
+ * It is set to the timestamp of the last GPS update update loop cycle in gps_trackerTask()
+ * it is used to keep even spaces between GPS updates
+ * network module uses it to detect if the GPS tracker is stuck on connect function
+ * and if so it will try to reactivate GPRS connection
+ */ 
+extern uint32_t g_trackerloop_tick;
+
+/**
+ * @brief Initialize the GPS tracker module.
+ * This function sets up the GPS hardware, initializes the internal GPS info structure,
+ */
+void  gps_Init(void);
+
+bool  gps_isValid(void);
+
+/**
+ * Get the last known GPS latitude.
+ * This function retrieves the last valid latitude from the GPS tracker data.
+ * @return the latitude in degrees  
+ */
+float gps_GetLastLatitude(void);
+
+/**
+ * @brief Get the last known GPS longitude.
+ * This function retrieves the last valid longitude from the GPS tracker data.
+ * @return the longitude in degrees
+ */
+float gps_GetLastLongitude(void);
+
+/**
+ * @brief Process the GPS data.
+ * This function updates the GpsTrackerData structure with the latest GPS information.
+ * It converts NMEA coordinates to decimal degrees and extracts speed, bearing, altitude, and accuracy.
+ * it should be called after each call to GPS_Parse().
+ */
+void  gps_Process(void);
+
+void  gps_PrintLocation(void);
+
+void  gps_TrackerTask(void *pData);
 
 #endif

@@ -110,17 +110,22 @@ Connect to the device via UART at 115200 baud rate to access the command interfa
 
 ### Available Commands
 
-| Command       | Syntax                  | Description                                           |
-|---------------|-------------------------|-------------------------------------------------------|
-| help          | help                    | Show help message with available commands             |
-| set           | set \<param\> [value]   | Set a configuration parameter                         |
-| get           | get [param]             | Get configuration parameter(s)                        |
-| ls            | ls [path]               | List files in directory                               |
-| rm            | rm \<file\>             | Remove a file                                         |
-| tail          | tail \<file\> [bytes]   | Show last bytes of file                               |
-| restart       | restart                 | Restart the device                                    |
-| netactivate   | netactivate             | Manually activate network connection                  |
-| netstatus     | netstatus               | Show network status                                   |
+| Command         | Syntax                              | Description                                                      |
+|-----------------|-------------------------------------|------------------------------------------------------------------|
+| help            | help                                | Show help message with available commands                        |
+| set             | set <param> [value]                 | Set a configuration parameter                                    |
+| get             | get [param]                         | Get configuration parameter(s)                                   |
+| ls              | ls [path]                           | List files in directory                                          |
+| rm              | rm <file>                           | Remove a file                                                    |
+| tail            | tail <file> [bytes]                 | Show last bytes of file                                          |
+| net activate    | net activate                        | Activate (attach and activate) the network                       |
+| net deactivate  | net deactivate                      | Deactivate (detach and deactivate) the network                   |
+| net status      | net status                          | Show network status                                              |
+| sms             | sms                                 | Show SMS storage info                                            |
+| sms ls          | sms ls <all\|read\|unread>         | List SMS messages (all/read/unread)                              |
+| sms rm          | sms rm <index\|all>                 | Remove SMS message by index or all messages                      |
+| location        | location                            | Show the last known GPS position                                 |
+| restart         | restart                             | Restart the system immediately                                   |
 
 ### Configuration Parameters
 

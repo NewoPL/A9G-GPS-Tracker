@@ -3,13 +3,16 @@
 
 #include <api_os.h>
 #include <api_socket.h>
+#include <api_hal_uart.h>
 #include <api_ssl.h>
 
 #include "http.h"
 #include "config_store.h"
 #include "debug.h"
 
-const char *ca_cert = "-----BEGIN CERTIFICATE-----\n\
+#define MODULE_TAG "Network"
+
+const char ca_cert[] = "-----BEGIN CERTIFICATE-----\n\
 MIICjjCCAjOgAwIBAgIQf/NXaJvCTjAtkOGKQb0OHzAKBggqhkjOPQQDAjBQMSQw\n\
 IgYDVQQLExtHbG9iYWxTaWduIEVDQyBSb290IENBIC0gUjQxEzARBgNVBAoTCkds\n\
 b2JhbFNpZ24xEzARBgNVBAMTCkdsb2JhbFNpZ24wHhcNMjMxMjEzMDkwMDAwWhcN\n\
@@ -26,18 +29,7 @@ hkjOPQQDAgNJADBGAiEAokJL0LgR6SOLR02WWxccAq3ndXp4EMRveXMUVUxMWSMC\n\
 IQDspFWa3fj7nLgouSdkcPy1SdOR2AGm9OQWs7veyXsBwA==\n\
 -----END CERTIFICATE-----";
 
-static SSL_Config_t SSLconfig = {
-    .caCert          = NULL,
-    .caCrl           = NULL,
-    .clientCert      = NULL,
-    .clientKey       = NULL,
-    .clientKeyPasswd = NULL,
-    .hostName        = NULL,
-    .minVersion      = SSL_VERSION_SSLv3,
-    .maxVersion      = SSL_VERSION_TLSv1_2,
-    .verifyMode      = SSL_VERIFY_MODE_OPTIONAL,
-    .entropyCustom   = "GPRS"
-};
+static SSL_Config_t SSLconfig;
 
 static inline int http_send_receive(const char *hostName,
                                     const char *port,
@@ -139,8 +131,7 @@ static inline int http_send_receive(const char *hostName,
 }
 
 
-static inline int https_send_receive(SSL_Config_t *sslConfig,
-                                     const char   *hostName,
+static inline int https_send_receive(const char   *hostName,
                                      const char   *port,
                                      char         *buffer,
                                      int           bufferLen,
@@ -148,57 +139,68 @@ static inline int https_send_receive(SSL_Config_t *sslConfig,
                                      int           retBufferSize)
 {
     SSL_Error_t error;
-    sslConfig->caCert = ca_cert;
-    sslConfig->hostName = hostName;
 
-    error = SSL_Init(sslConfig);
+    // Setup full SSL config
+    memset(&SSLconfig, 0, sizeof(SSL_Config_t));
+    SSLconfig.caCert          = ca_cert;
+    SSLconfig.caCrl           = NULL;
+    SSLconfig.clientCert      = NULL;
+    SSLconfig.clientKey       = NULL;
+    SSLconfig.clientKeyPasswd = NULL;
+    SSLconfig.hostName        = hostName;
+    SSLconfig.minVersion      = SSL_VERSION_SSLv3;
+    SSLconfig.maxVersion      = SSL_VERSION_TLSv1_2;
+    SSLconfig.verifyMode      = SSL_VERIFY_MODE_OPTIONAL;
+    SSLconfig.entropyCustom   = "GPRS";
+
+    error = SSL_Init(&SSLconfig);
     if(error != SSL_ERROR_NONE) {
-        LOGD("SSL init error: %d", error);
+        LOGI("SSL init error: %d", error);
         return error;
     }
 
-    // Connect to server
-    error = SSL_Connect(sslConfig, hostName, port);
+    // Connect to server using IP address
+    error = SSL_Connect(&SSLconfig, hostName, port);
     if(error != SSL_ERROR_NONE) {
-        LOGD("SSL connect error: %d", error);
+        LOGI("SSL connect error: %d", error);
         goto err_ssl_destroy;
     }
 
     // Send package
-    error = SSL_Write(sslConfig, buffer, bufferLen, SSL_WRITE_TIMEOUT);
+    error = SSL_Write(&SSLconfig, buffer, bufferLen, SSL_WRITE_TIMEOUT);
     if(error <= 0) {
-        LOGD("SSL Write error: %d", error);
+        LOGI("SSL Write error: %d", error);
         goto err_ssl_close;
     }
 
     // Read response
     memset(retBuffer, 0, retBufferSize);
-    error = SSL_Read(sslConfig, retBuffer, retBufferSize, SSL_READ_TIMEOUT);
+    error = SSL_Read(&SSLconfig, retBuffer, retBufferSize, SSL_READ_TIMEOUT);
     if(error < 0) {
-        LOGD("SSL Read error: %d", error);
+        LOGI("SSL Read error: %d", error);
         goto err_ssl_close;
     }
     if(error == 0) {
-        LOGD("SSL no receive response");
+        LOGI("SSL no receive response");
         error = SSL_ERROR_INTERNAL;
         goto err_ssl_close;
     }
 
 err_ssl_close:
-    if (SSL_Close(sslConfig) != SSL_ERROR_NONE) {
-        LOGD("SSL close error: %d", error);
+    if (SSL_Close(&SSLconfig) != SSL_ERROR_NONE) {
+        LOGI("SSL close error: %d", error);
     }
 
 err_ssl_destroy:
-    if (SSL_Destroy(sslConfig) != SSL_ERROR_NONE) {
-        LOGD("SSL destroy error: %d", error);
+    if (SSL_Destroy(&SSLconfig) != SSL_ERROR_NONE) {
+        LOGI("SSL destroy error: %d", error);
     }
 
     return error;
 }
 
 
-int Http_Post(bool secure,
+int Http_Post(bool          secure,
               const char   *hostName, 
               const char   *port, 
               const char   *path, 
@@ -255,8 +257,7 @@ int Http_Post(bool secure,
                                       retBufferSize);
     else
         // Use SSL for secure connection        
-        returnVal = https_send_receive(&SSLconfig,
-                                       hostName,
+        returnVal = https_send_receive(hostName,
                                        port,
                                        buffer,
                                        bufferLen,

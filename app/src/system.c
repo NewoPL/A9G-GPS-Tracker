@@ -19,6 +19,7 @@
 #include "utils.h"
 #include "debug.h"
 
+#define MODULE_TAG "System"
 
 #define MAIN_TASK_STACK_SIZE      (4096 * 2)
 #define MAIN_TASK_PRIORITY        (0)
@@ -33,10 +34,6 @@ HANDLE  appMainTaskHandle = NULL;
 
 uint8_t systemStatus = 0;
 
-uint8_t g_RSSI = 0;
-float   g_last_latitude  = 0.0f;
-float   g_last_longitude = 0.0f;
-
 static void EventHandler(API_Event_t* pEvent)
 {
     switch(pEvent->id)
@@ -47,7 +44,7 @@ static void EventHandler(API_Event_t* pEvent)
             break;
         case API_EVENT_ID_SIMCARD_DROP:
             GSM_ACTIVE_OFF();
-            LOGE("sim card %d drop !",pEvent->param1);
+            LOGE("sim card %d drop !", pEvent->param1);
             break;
         case API_EVENT_ID_NETWORK_REGISTER_DENIED:
             GSM_REGISTERED_OFF();
@@ -57,60 +54,22 @@ static void EventHandler(API_Event_t* pEvent)
             GSM_REGISTERED_OFF();
             LOGE("network register no");
             break;
-
-        case API_EVENT_ID_NETWORK_REGISTERED_HOME:
-        case API_EVENT_ID_NETWORK_REGISTERED_ROAMING:
-            GSM_REGISTERED_ON();    
-            LOGW("network register success");
-            NetworkAttachActivate();
-            break;
-
-        case API_EVENT_ID_NETWORK_ATTACHED:
-            GSM_ACTIVE_OFF(); 
-            LOGW("network attach success");
-            NetworkAttachActivate();            
-            break;
-
-        case API_EVENT_ID_NETWORK_ACTIVATED:
-            GSM_ACTIVE_ON();
-            LOGW("network activate success");
-            break;
-
-        case API_EVENT_ID_NETWORK_ACTIVATE_FAILED:
-            LOGE("network activate failed");
-            break;
-
-        case API_EVENT_ID_NETWORK_DEACTIVED:
-            GSM_ACTIVE_OFF(); 
-            LOGE("network deactived");
-            break;
-
-        case API_EVENT_ID_NETWORK_ATTACH_FAILED:
-            GSM_ACTIVE_OFF(); 
-            LOGE("network attach failed");
-            break;
-
         case API_EVENT_ID_NETWORK_DETACHED:
             LOGE("network detached");
             break;
-
         case API_EVENT_ID_SIGNAL_QUALITY:
             g_RSSI = csq_to_percent(pEvent->param1);
             break;
-
         case API_EVENT_ID_NETWORK_CELL_INFO:
             NetworkCellInfoCallback((Network_Location_t*)pEvent->pParam1, pEvent->param1);
             break;
-
         case API_EVENT_ID_SYSTEM_READY:
             LOGW("system initialize complete");
             INITIALIZED_ON();
             break;
-
         case API_EVENT_ID_SMS_RECEIVED:
             HandleSmsReceived(pEvent);
             break;
-    
         case API_EVENT_ID_SMS_LIST_MESSAGE: {
             SMS_Message_Info_t* msg = (SMS_Message_Info_t*)pEvent->pParam1;
             HandleSmsListEvent(msg);
@@ -119,20 +78,9 @@ static void EventHandler(API_Event_t* pEvent)
         case API_EVENT_ID_GPS_UART_RECEIVED:
             if (g_ConfigStore.gps_logging)
                 LOGD("received GPS data, length:%d, data:\r\n%s",pEvent->param1,pEvent->pParam1);
-
             GPS_STATUS_ON();
             GPS_Update(pEvent->pParam1, pEvent->param1);
-
-            GPS_Info_t* gpsInfo = Gps_GetInfo();
-            g_last_latitude = minmea_tocoord(&gpsInfo->rmc.latitude);
-            g_last_longitude = minmea_tocoord(&gpsInfo->rmc.longitude);
-
-            if (gpsInfo->rmc.valid) {
-                GPS_FIX_ON();
-            } else {
-                GPS_FIX_OFF();
-            }
-
+            gps_Process();
             break;
         
         case API_EVENT_ID_UART_RECEIVED:
@@ -140,7 +88,7 @@ static void EventHandler(API_Event_t* pEvent)
             {
                 uint8_t data[(pEvent->param2 + 1)];
                 data[pEvent->param2] = 0;
-                memcpy(data,pEvent->pParam1,pEvent->param2);
+                memcpy(data, pEvent->pParam1, pEvent->param2);
                 HandleUartCommand(data);
             }
             break;
@@ -170,11 +118,11 @@ void app_MainTask(void *pData)
     TIME_SetIsAutoUpdateRtcTime(true);
     ConfigStore_Init();
     FsInfoTest();    
-    GPS_Init();
+    gps_Init();
     SMSInit();
 
     trackerTaskHandle = OS_CreateTask(
-        gps_trackerTask, NULL, NULL,
+        gps_TrackerTask, NULL, NULL,
         TRACKER_TASK_STACK_SIZE,
         TRACKER_TASK_PRIORITY, 
         0, 0, TRACKER_TASK_NAME);
@@ -190,7 +138,7 @@ void app_MainTask(void *pData)
             OS_Free(event->pParam1);
             OS_Free(event->pParam2);
             OS_Free(event);
-            OS_SleepUs(0);
+            OS_Sleep(1); // Yield to other tasks
         }
     }
 }
