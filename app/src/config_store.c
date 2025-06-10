@@ -15,6 +15,8 @@
 #include "utils.h"
 #include "debug.h"
 
+#define MODULE_TAG "Config"
+
 t_Config g_ConfigStore;
 
 static bool parse_line(char* line)
