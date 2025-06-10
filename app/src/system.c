@@ -43,11 +43,7 @@ static void EventHandler(API_Event_t* pEvent)
             break;
         case API_EVENT_ID_SIMCARD_DROP:
             GSM_ACTIVE_OFF();
-            LOGE("sim card %d drop !",pEvent->param1);
-            break;
-        case API_EVENT_ID_NETWORK_REGISTER_SEARCHING:
-            GSM_REGISTERED_OFF();
-            LOGE("network register searching");
+            LOGE("sim card %d drop !", pEvent->param1);
             break;
         case API_EVENT_ID_NETWORK_REGISTER_DENIED:
             GSM_REGISTERED_OFF();
@@ -57,61 +53,22 @@ static void EventHandler(API_Event_t* pEvent)
             GSM_REGISTERED_OFF();
             LOGE("network register no");
             break;
-
-        case API_EVENT_ID_NETWORK_REGISTERED_HOME:
-        case API_EVENT_ID_NETWORK_REGISTERED_ROAMING:
-            GSM_REGISTERED_ON();    
-            LOGW("network register success");
-            NetworkAttachActivate();
-            break;
-
-        case API_EVENT_ID_NETWORK_ATTACHED:
-            GSM_ACTIVE_OFF(); 
-            LOGW("network attach success");
-            NetworkAttachActivate();            
-            break;
-
-        case API_EVENT_ID_NETWORK_ACTIVATED:
-            GSM_ACTIVE_ON();
-            LOGW("network activate success");
-            break;
-
-        case API_EVENT_ID_NETWORK_ACTIVATE_FAILED:
-            LOGE("network activate failed");
-            break;
-
-        case API_EVENT_ID_NETWORK_DEACTIVED:
-            GSM_ACTIVE_OFF(); 
-            LOGE("network deactived");
-            NetworkAttachActivate();
-            break;
-
-        case API_EVENT_ID_NETWORK_ATTACH_FAILED:
-            GSM_ACTIVE_OFF(); 
-            LOGE("network attach failed");
-            break;
-
         case API_EVENT_ID_NETWORK_DETACHED:
             LOGE("network detached");
             break;
-
         case API_EVENT_ID_SIGNAL_QUALITY:
             g_RSSI = csq_to_percent(pEvent->param1);
             break;
-
         case API_EVENT_ID_NETWORK_CELL_INFO:
             NetworkCellInfoCallback((Network_Location_t*)pEvent->pParam1, pEvent->param1);
             break;
-
         case API_EVENT_ID_SYSTEM_READY:
             LOGW("system initialize complete");
             INITIALIZED_ON();
             break;
-
         case API_EVENT_ID_SMS_RECEIVED:
             HandleSmsReceived(pEvent);
             break;
-    
         case API_EVENT_ID_SMS_LIST_MESSAGE: {
             SMS_Message_Info_t* msg = (SMS_Message_Info_t*)pEvent->pParam1;
             HandleSmsListEvent(msg);
@@ -130,7 +87,7 @@ static void EventHandler(API_Event_t* pEvent)
             {
                 uint8_t data[(pEvent->param2 + 1)];
                 data[pEvent->param2] = 0;
-                memcpy(data,pEvent->pParam1,pEvent->param2);
+                memcpy(data, pEvent->pParam1, pEvent->param2);
                 HandleUartCommand(data);
             }
             break;
