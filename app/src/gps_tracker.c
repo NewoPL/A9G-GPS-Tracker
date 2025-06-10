@@ -21,6 +21,7 @@ GPS_Info_t* gpsInfo = NULL;
 
 void gps_Init() 
 {
+    GPS_STATUS_OFF();
     GPS_Init();
     gpsInfo = Gps_GetInfo();
 }
@@ -68,7 +69,7 @@ void gps_PrintLocation(void)
     UART_Printf("sat visble:%d, sat tracked:%d, ", gpsInfo->gsv[0].total_sats, gpsInfo->gga.satellites_tracked);
     UART_Printf("lat: %.6f° %c, lon: %.6f° %c, ", fabs(GpsTrackerData.latitude), (GpsTrackerData.latitude >= 0) ? 'N' : 'S',
                                                   fabs(GpsTrackerData.longitude), (GpsTrackerData.longitude >= 0) ? 'E' : 'W');
-    UART_Printf("alt: %.1f, spd=%.1f, hdg=.1f, ", gpsInfo->gga.altitude, GpsTrackerData.speed, GpsTrackerData.bearing);
+    UART_Printf("alt:%.1f, spd:%.1f, hdg:%.1f, ", gpsInfo->gga.altitude, GpsTrackerData.speed, GpsTrackerData.bearing);
     UART_Printf("accur: %.1f\r\n", GpsTrackerData.accuracy);
     return;
 }

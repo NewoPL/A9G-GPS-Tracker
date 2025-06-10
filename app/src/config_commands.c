@@ -269,8 +269,6 @@ void HandleTailCommand(char* args)
 
 void HandleLocationCommand(char* param)
 {
-    GPS_Info_t* gpsInfo = Gps_GetInfo();
-    
     // First check if GPS is active
     if (!IS_GPS_STATUS_ON()) {
         UART_Printf("GPS is not active.\r\n");
