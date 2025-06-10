@@ -68,18 +68,18 @@ void log_message_internal(t_logLevel level, const char *tag, const char *format,
     TIME_GetRtcTime(&time);
 
     char timebuf[16];
-    snprintf(timebuf, sizeof(timebuf), "[%02u:%02u.%02u]", time.hour,time.minute,time.second);
+    snprintf(timebuf, sizeof(timebuf), "%02u:%02u.%02u", time.hour,time.minute,time.second);
 
     // Get logger output type from ConfigStore
     switch (g_ConfigStore.logOutput) {
         case LOGGER_OUTPUT_TRACE:
-            Trace(level, "%s [%s] %s\n", timebuf, tag, message);
+            Trace(level, "[%s] [%s] %s\n", timebuf, tag, message);
             break;
         case LOGGER_OUTPUT_FILE:
-            FILE_Printf("%s [%s] %s\n", timebuf, tag, message);
+            FILE_Printf("[%s] [%s] [%s] %s\n", timebuf, tag, LogLevelSerializer(&level), message);
             break;
         default:
-            UART_Printf("%s [%s] %s\n", timebuf, tag, message);
+            UART_Printf("[%s] [%s] [%s] %s\n", timebuf, tag, LogLevelSerializer(&level), message);
             break;
     }
 }
