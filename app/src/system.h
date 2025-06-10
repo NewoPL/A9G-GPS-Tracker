@@ -1,6 +1,15 @@
 #ifndef SYSTEM_H
 #define SYSTEM_H
 
+/**
+ * Interval in milliseconds for network monitoring
+ * This is used to check the network status periodically.
+ * Network monitor asks for the current cell information and verifies
+ * if the gps tracker thread is not stuck on initiating connection.
+ * in case of ssl connection failure, the network is reactivated.
+ */
+#define NETWORK_MONITOR_INTERVAL_MS  15000 
+
 typedef enum {
     STATUS_INITIALIZED    = 1 << 0,
     STATUS_GPS_ON         = 1 << 1,
