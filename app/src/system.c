@@ -19,6 +19,7 @@
 #include "utils.h"
 #include "debug.h"
 
+#define MODULE_TAG "System"
 
 #define MAIN_TASK_STACK_SIZE      (4096 * 2)
 #define MAIN_TASK_PRIORITY        (0)

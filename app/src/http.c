@@ -10,6 +10,8 @@
 #include "config_store.h"
 #include "debug.h"
 
+#define MODULE_TAG "Network"
+
 const char ca_cert[] = "-----BEGIN CERTIFICATE-----\n\
 MIICjjCCAjOgAwIBAgIQf/NXaJvCTjAtkOGKQb0OHzAKBggqhkjOPQQDAjBQMSQw\n\
 IgYDVQQLExtHbG9iYWxTaWduIEVDQyBSb290IENBIC0gUjQxEzARBgNVBAoTCkds\n\

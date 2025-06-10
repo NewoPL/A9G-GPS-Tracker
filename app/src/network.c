@@ -12,6 +12,8 @@
 #include "network.h"
 #include "debug.h"
 
+#define MODULE_TAG "Network"
+
 uint8_t g_RSSI = 0;
 char    g_cellInfo[128] = "\0";
 static Network_Status_t g_NetworkStatus = 0;

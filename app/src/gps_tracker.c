@@ -17,6 +17,8 @@
 #include "utils.h"
 #include "debug.h"
 
+#define MODULE_TAG "GPS Tracker"
+
 GPS_Info_t* gpsInfo = NULL;
 
 void gps_Init() 

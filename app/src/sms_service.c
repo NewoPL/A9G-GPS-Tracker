@@ -19,6 +19,8 @@
 #include "utils.h"
 #include "debug.h"
 
+#define MODULE_TAG "SMS"
+
 void SMSInit()
 {
     if(!SMS_SetFormat(SMS_FORMAT_TEXT, SIM0))
