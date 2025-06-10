@@ -16,6 +16,8 @@
 #define DEFAULT_LOG_LEVEL         "info"
 #define DEFAULT_LOG_OUTPUT        "uart"
 
+extern uint32_t g_trackerloop_tick;
+
 void  gps_Init(void);
 
 bool  gps_isValid(void);

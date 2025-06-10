@@ -45,6 +45,10 @@ static void EventHandler(API_Event_t* pEvent)
             GSM_ACTIVE_OFF();
             LOGE("sim card %d drop !",pEvent->param1);
             break;
+        case API_EVENT_ID_NETWORK_REGISTER_SEARCHING:
+            GSM_REGISTERED_OFF();
+            LOGE("network register searching");
+            break;
         case API_EVENT_ID_NETWORK_REGISTER_DENIED:
             GSM_REGISTERED_OFF();
             LOGE("network register denied");

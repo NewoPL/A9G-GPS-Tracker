@@ -91,8 +91,9 @@ bool  gps_isValid(void)
            (gpsInfo->rmc.longitude.scale != 0);
 }
 
-uint8_t requestBuffer[400];
-uint8_t responseBuffer[1024];
+uint32_t g_trackerloop_tick = 0;
+uint8_t  requestBuffer[400];
+uint8_t  responseBuffer[1024];
 
 void gps_trackerTask(void *pData)
 {
@@ -136,7 +137,8 @@ void gps_trackerTask(void *pData)
 
     while(1)
     {
-        uint32_t    loop_start = time(NULL);
+        g_trackerloop_tick = time(NULL);
+        
         if(IS_GPS_STATUS_ON()) // && gps_isValid)
         {
             uint8_t percent;
@@ -182,7 +184,7 @@ void gps_trackerTask(void *pData)
         }
 
         uint32_t loop_end = time(NULL);
-        uint32_t loop_duration = (loop_end - loop_start);
+        uint32_t loop_duration = (loop_end - g_trackerloop_tick);
         uint32_t desired_interval = 10; // target loop period in seconds (e.g., 10 seconds)
 
         if (loop_duration > desired_interval) loop_duration = desired_interval;

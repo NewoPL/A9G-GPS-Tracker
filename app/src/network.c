@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <time.h>
 
 #include <api_os.h>
 #include <api_network.h>
@@ -23,6 +24,15 @@ void NetworkCellInfoGet(void* param)
 {
     if (param == NULL) return;
 
+    if (g_trackerloop_tick > 0)
+    {
+        uint32_t now = time(NULL);
+        if (now - g_trackerloop_tick > 150000) {
+            LOGE("gps_tracker watchdog: loop stuck, deactivating network!");
+            Network_StartDeactive(1);
+        }
+    }
+
     if (IS_GSM_REGISTERED()) {
         if(!Network_GetCellInfoRequst()) {
             g_cellInfo[0] = '\0';
@@ -31,7 +41,6 @@ void NetworkCellInfoGet(void* param)
     } else {
         g_cellInfo[0] = '\0';
     }
-
     HANDLE taskHandle = (HANDLE)param;
     Network_SetCellInfoTimer(taskHandle);
 }
@@ -115,6 +124,10 @@ static void SetApnContext() {
 bool NetworkAttachActivate()
 {
     uint8_t status;
+    if (!IS_GSM_REGISTERED()) {
+        LOGE("network not registered");
+        return false;
+    }
     bool ret = Network_GetAttachStatus(&status);
     if(!ret)
     {
