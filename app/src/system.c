@@ -58,7 +58,7 @@ static void EventHandler(API_Event_t* pEvent)
             LOGE("network detached");
             break;
         case API_EVENT_ID_SIGNAL_QUALITY:
-            g_RSSI = csq_to_percent(pEvent->param1);
+            NetworkSigQualityCallback(pEvent->param1);
             break;
         case API_EVENT_ID_NETWORK_CELL_INFO:
             NetworkCellInfoCallback((Network_Location_t*)pEvent->pParam1, pEvent->param1);

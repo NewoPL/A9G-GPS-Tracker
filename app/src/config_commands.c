@@ -285,7 +285,6 @@ void HandleNetworkStatusCommand(char* param)
     UART_Printf("GSM Network registered: %s, active: %s\r\n",
                 IS_GSM_REGISTERED() ? "true" : "false",
                 IS_GSM_ACTIVE() ? "true" : "false");
-    
     // Get and display IP address if network is active
     if (IS_GSM_ACTIVE()) {
         char ip_address[16] = {0};
@@ -297,17 +296,8 @@ void HandleNetworkStatusCommand(char* param)
     } else {
         UART_Printf("IP address: not available\r\n");
     }
-
-    if (g_cellInfo[0] != 0) {
-        UART_Printf("Cell info: %s\r\n", g_cellInfo);
-        // Try to parse and print cell info fields if present
-        int mcc = 0, mnc = 0, lac = 0, cellid = 0, rxlev = 0;
-        if (sscanf(g_cellInfo, "%3d,%3d,%d,%d,%d", &mcc, &mnc, &lac, &cellid, &rxlev) == 5) {
-            UART_Printf("  MCC: %03d\r\n  MNC: %03d\r\n  LAC: %d\r\n  CellID: %d\r\n  RxLev: %d\r\n",
-                mcc, mnc, lac, cellid, rxlev);
-        }
-    } else
-        UART_Printf("Cell info not available\r\n");
+    // Print cell info using network module function
+    NetworkPrintCellInfo();
 }
 
 void HandleNetworkActivateCommand(char* param)

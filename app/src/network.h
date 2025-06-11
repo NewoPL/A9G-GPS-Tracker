@@ -1,13 +1,7 @@
 #ifndef NETWORK_H
 #define NETWORK_H
 
-/*
- * @brief Global variable to store cell information.
- *
- * This variable is used to hold the formatted cell information string
- * that can be accessed by other parts of the application.  
- */
-extern char g_cellInfo[];
+
 
 /**
  * @brief Setups capturing network state.
@@ -45,6 +39,37 @@ Network_Status_t NetworkGetStatus(void);
  */
 void NetworkCellInfoCallback(Network_Location_t* loc, int number);
 
-extern uint8_t g_RSSI;
+/**
+ * @brief Callback function to handle network signal quality updates.
+ * 
+ * This function converts the CSQ value to a percentage and logs it.
+ * it is called whenever the signal quality changes.
+ * It updates the global signal strength variable `g_RSSI` based on the received CSQ value.
+ *
+ * @param CSQ The received signal quality value (CSQ).
+ * @note The CSQ value is typically in the range of 0-31, where 0 indicates no signal and 31 indicates the best signal quality.
+ * 
+ */
+void NetworkSigQualityCallback(int CSQ);
+
+/**
+ * @brief Prints the current Base Statsion information to the UART.
+ * 
+ * This function formats the cell information stored in the global `g_cellInfo` variable
+ * and prints it to the UART for debugging or monitoring purposes.  
+ * It includes details such as MCC, MNC, LAC, Cell ID, and RxLev.
+ * If no cell information is available, it prints a message indicating that.
+ */
+const char* Network_GetCellInfoString(void);
+
+/**
+ * @brief Prints information on all visible BaseStations to the UART.
+ * 
+ * This function formats the cell information stored in the global `g_cellInfo` variable
+ * and prints it to the UART for debugging or monitoring purposes.  
+ * It includes details such as MCC, MNC, LAC, Cell ID, and RxLev.
+ * If no cell information is available, it prints a message indicating that.
+ */
+void NetworkPrintCellInfo(void);
 
 #endif

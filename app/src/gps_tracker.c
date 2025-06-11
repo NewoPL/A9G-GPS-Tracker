@@ -153,8 +153,9 @@ void gps_TrackerTask(void *pData)
             gps_PrintLocation();
 
             responseBuffer[0] = '\0';
-            if (strlen(g_cellInfo) != 0)
-                snprintf(responseBuffer, sizeof(responseBuffer),"&cell=%s", g_cellInfo);
+            const char* cellInfoStr = Network_GetCellInfoString();
+            if (cellInfoStr && strlen(cellInfoStr) != 0)
+                snprintf(responseBuffer, sizeof(responseBuffer),"&cell=%s", cellInfoStr);
 
             snprintf(requestBuffer, sizeof(requestBuffer),
                 "id=%s&valid=%d&timestamp=%d&lat=%f&lon=%f&speed=%1.f&bearing=%.1f&altitude=%.1f&accuracy=%.1f%s&batt=%d",
