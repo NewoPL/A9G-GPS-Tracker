@@ -52,6 +52,9 @@ void gps_Process(void)
     GpsTrackerData.accuracy  = minmea_tofloat(&gpsInfo->gsa[0].hdop) * 
                                                g_ConfigStore.gps_uere; // User Equivalent Range Error (UERE) in meters 
 
+    if (!gpsInfo->rmc.valid)
+        GpsTrackerData.timestamp = time(NULL);
+
     return;    
 }
 
@@ -106,13 +109,17 @@ void gps_TrackerTask(void *pData)
         LOGE("get GPS firmware version failed");
     else
         LOGW("GPS firmware version: %s", responseBuffer);
+   
+    RTC_Time_t time;
+    TIME_GetRtcTime(&time);
+    if(!GPS_SetRtcTime(&time)) LOGE("set gps time failed");
 
-    GPS_SetSearchMode(true, false, false, true);
+    GPS_SetSearchMode(true, false, true, true);
 
     // if(!GPS_ClearLog())
     //    LOGE("open file failed, please check tf card");
 
-    // if(!GPS_ClearInfoInFlash())
+    //if(!GPS_ClearInfoInFlash())
     //     LOGE("erase gps fail");
     
     // if(!GPS_SetQzssOutput(false))
@@ -197,15 +204,17 @@ int gps_PerformAgps(void)
         UART_Printf("LBS get location failed.\r\n");
         longitude = gps_GetLastLongitude();
         latitude = gps_GetLastLatitude();
-        UART_Printf("Last known position: lat: %.1f, lon: %.6f\n\r",
+        UART_Printf("Last known position: lat: %.6f, lon: %.6f\r\n",
                     latitude, longitude);
     } else {
-        UART_Printf("Network GSM location: lat: %.1f, lon: %.6f\n\r",
+        UART_Printf("Network based position: lat: %.6f, lon: %.6f\r\n",
                     latitude, longitude);
     }
     // Call AGPS
     if (!GPS_AGPS(latitude, longitude, 0, true)) {
+        UART_Printf("Assisted GPS start failed\n\r");
         return -1; // AGPS failed
     }
+    UART_Printf("Assisted GPS start succeeded\n\r");
     return 0; // AGPS success
 }

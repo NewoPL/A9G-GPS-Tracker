@@ -217,7 +217,7 @@ int Http_Post(bool          secure,
     const char* fmt = "POST %s HTTP/1.1\r\n"
                       "Host: %s\r\n"
                       "Content-Type: application/x-www-form-urlencoded\r\n"
-                      "Connection: close\r\n"
+                      "Connection: Keep-Alive\r\n"
                       "Content-Length: %d\r\n\r\n%s";
 
     // Calculate the required buffer size
