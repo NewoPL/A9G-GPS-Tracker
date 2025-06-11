@@ -1,8 +1,6 @@
 #ifndef NETWORK_H
 #define NETWORK_H
 
-
-
 /**
  * @brief Setups capturing network state.
  * 
@@ -33,7 +31,7 @@ Network_Status_t NetworkGetStatus(void);
 /**
  * @brief Callback function to handle network cell information updates.
  * 
- * This function should be called by the event handler functionfor each
+ * This function should be called by the event handler function for each
  * API_EVENT_ID_NETWORK_CELL_INFO event. It formats the cell information into a string
  * and stores it in the global `g_cellInfo` variable.
  */
@@ -53,22 +51,20 @@ void NetworkCellInfoCallback(Network_Location_t* loc, int number);
 void NetworkSigQualityCallback(int CSQ);
 
 /**
- * @brief Prints the current Base Statsion information to the UART.
+ * @brief Gets the current cell information as a formatted string.
+ *
+ * This function retrieves the cell information last received and 
+ * formats it into a string representation.
  * 
- * This function formats the cell information stored in the global `g_cellInfo` variable
- * and prints it to the UART for debugging or monitoring purposes.  
- * It includes details such as MCC, MNC, LAC, Cell ID, and RxLev.
- * If no cell information is available, it prints a message indicating that.
+ * @return A pointer to a string containing the cell information in the format "MCC,MNC,LAC,CellID,RxLev". 
  */
 const char* Network_GetCellInfoString(void);
 
 /**
  * @brief Prints information on all visible BaseStations to the UART.
  * 
- * This function formats the cell information stored in the global `g_cellInfo` variable
- * and prints it to the UART for debugging or monitoring purposes.  
+ * This function prints  to the UART information on all basestations seen by the device.
  * It includes details such as MCC, MNC, LAC, Cell ID, and RxLev.
- * If no cell information is available, it prints a message indicating that.
  */
 void NetworkPrintCellInfo(void);
 

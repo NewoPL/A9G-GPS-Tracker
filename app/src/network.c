@@ -17,14 +17,6 @@
 
 #define MODULE_TAG "Network"
 
-/*
- * @brief Global variable to store cell information.
- *
- * This variable is used to hold the formatted cell information string
- * that can be accessed by other parts of the application.  
- */
-char    g_cellInfoStr[128] = "\0";
-
 static bool apn_workaround_pending = false;  
 #define MAX_CELLINFO_COUNT 8
 
@@ -34,9 +26,17 @@ static Network_Location_t    g_CellInfo[MAX_CELLINFO_COUNT];
 static uint8_t               g_CellInfoCount = 0;
 static uint8_t               g_RSSI = 0;
 
+/*
+ * @brief Global variable to store cell information.
+ *
+ * This variable is used to hold the formatted cell information string
+ * that can be accessed by other parts of the application.  
+ */
+static char g_cellInfoStr[128] = "\0";
+
 static void NetworkMonitorTimer(HANDLE);
 
-void NetworkMonitor(void* param)
+static void NetworkMonitor(void* param)
 {
     if (param == NULL) return;
 
