@@ -68,11 +68,15 @@ static void EventHandler(API_Event_t* pEvent)
             INITIALIZED_ON();
             break;
         case API_EVENT_ID_SMS_RECEIVED:
-            HandleSmsReceived(pEvent);
+            SmsReceivedCallback(
+                (SMS_Encode_Type_t)pEvent->param1,
+                (const char*) pEvent->pParam1,
+                (const char*)pEvent->pParam2,
+                (uint32_t)pEvent->param2);
             break;
         case API_EVENT_ID_SMS_LIST_MESSAGE: {
             SMS_Message_Info_t* msg = (SMS_Message_Info_t*)pEvent->pParam1;
-            HandleSmsListEvent(msg);
+            SmsListMessageCallback(msg);
             break;
         }
         case API_EVENT_ID_GPS_UART_RECEIVED:
@@ -119,7 +123,7 @@ void app_MainTask(void *pData)
     ConfigStore_Init();
     FsInfoTest();    
     gps_Init();
-    SMSInit();
+    SmsInit();
 
     trackerTaskHandle = OS_CreateTask(
         gps_TrackerTask, NULL, NULL,

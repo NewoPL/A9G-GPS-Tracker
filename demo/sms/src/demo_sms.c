@@ -29,7 +29,7 @@ const uint8_t utf8Msg[]    = "utf-8测试短信";//Cause the encoding format of 
 static HANDLE mainTaskHandle = NULL;
 static uint8_t flag = 0;
 
-void SMSInit()
+void SmsInit()
 {
     if(!SMS_SetFormat(SMS_FORMAT_TEXT,SIM0))
     {
@@ -69,7 +69,7 @@ void UartInit()
 void Init()
 {
     UartInit();
-    SMSInit();
+    SmsInit();
 }
 
 

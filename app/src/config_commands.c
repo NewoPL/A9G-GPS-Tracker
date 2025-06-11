@@ -17,22 +17,22 @@
 
 typedef void (*UartCmdHandler)(char*);
 
-void HandleHelpCommand(char*);
-void HandleLsCommand(char*);
-void HandleRemoveFileCommand(char*);
-void HandleSetCommand(char*);
-void HandleGetCommand(char*);
-void HandleTailCommand(char*);
-void HandleRestartCommand(char*);
-void HandleNetworkActivateCommand(char*);
-void HandleNetworkStatusCommand(char*);
-void HandleNetworkDeactivateCommand(char*);
-void HandleLocationCommand(char*);
-void HandleLbsCommand(char*);
-void HandleAgpsCommand(char*);
-void HandleSmsCommand(char*);
-void HandleSmsLsCommand(char*);
-void HandleSmsRmCommand(char*);
+static void HandleHelpCommand(char*);
+static void HandleLsCommand(char*);
+static void HandleRemoveFileCommand(char*);
+static void HandleSetCommand(char*);
+static void HandleGetCommand(char*);
+static void HandleTailCommand(char*);
+static void HandleRestartCommand(char*);
+static void HandleNetworkActivateCommand(char*);
+static void HandleNetworkStatusCommand(char*);
+static void HandleNetworkDeactivateCommand(char*);
+static void HandleLocationCommand(char*);
+static void HandleLbsCommand(char*);
+static void HandleAgpsCommand(char*);
+static void HandleSmsCommand(char*);
+static void HandleSmsLsCommand(char*);
+static void HandleSmsRmCommand(char*);
 
 struct uart_cmd_entry {
     const char* cmd;
@@ -90,7 +90,7 @@ static void InitUartCmdTableSortedIdx(void)
     }
 }
 
-void HandleSetCommand(char* param)
+static void HandleSetCommand(char* param)
 {
     param = trim_whitespace(param);
     if (!*param) {
@@ -127,7 +127,7 @@ void HandleSetCommand(char* param)
     return;
 }
 
-void HandleGetCommand(char* param)
+static void HandleGetCommand(char* param)
 {
     param = trim_whitespace(param);
 
@@ -153,7 +153,7 @@ void HandleGetCommand(char* param)
     return;
 }
 
-void HandleLsCommand(char* path)
+static void HandleLsCommand(char* path)
 {
     path = trim_whitespace(path);
     if (!path || path[0] == '\0') path = "/";
@@ -205,7 +205,7 @@ void HandleLsCommand(char* path)
     API_FS_CloseDir(dir);
 }
 
-void HandleRemoveFileCommand(char* path)
+static void HandleRemoveFileCommand(char* path)
 {
     path = trim_whitespace(path);
     if (!path || path[0] == '\0') {
@@ -220,7 +220,7 @@ void HandleRemoveFileCommand(char* path)
     }
 }
 
-void HandleTailCommand(char* args)
+static void HandleTailCommand(char* args)
 {
     int bytes = 500;
     char* file_path = trim_whitespace(args);
@@ -269,7 +269,7 @@ void HandleTailCommand(char* args)
     API_FS_Close(fd);
 }
 
-void HandleLocationCommand(char* param)
+static void HandleLocationCommand(char* param)
 {
     // First check if GPS is active
     if (!IS_GPS_STATUS_ON()) {
@@ -280,7 +280,7 @@ void HandleLocationCommand(char* param)
     return;
 }
 
-void HandleNetworkStatusCommand(char* param)
+static void HandleNetworkStatusCommand(char* param)
 {
     UART_Printf("GSM Network registered: %s, active: %s\r\n",
                 IS_GSM_REGISTERED() ? "true" : "false",
@@ -300,7 +300,7 @@ void HandleNetworkStatusCommand(char* param)
     NetworkPrintCellInfo();
 }
 
-void HandleNetworkActivateCommand(char* param)
+static void HandleNetworkActivateCommand(char* param)
 {
     if (NetworkAttachActivate()) {
         UART_Printf("Network activated.\r\n");
@@ -309,7 +309,7 @@ void HandleNetworkActivateCommand(char* param)
     }
 }
 
-void HandleNetworkDeactivateCommand(char* param)
+static void HandleNetworkDeactivateCommand(char* param)
 {
     if (Network_StartDeactive(1)) {
         UART_Printf("Network deactivated.\r\n");
@@ -318,13 +318,13 @@ void HandleNetworkDeactivateCommand(char* param)
     }
 }
 
-void HandleRestartCommand(char* args)
+static void HandleRestartCommand(char* args)
 {
     UART_Printf("System restarting...\r\n");
     PM_Restart();
 }
 
-void HandleHelpCommand(char* args)
+static void HandleHelpCommand(char* args)
 {
     UART_Printf("\r\nAvailable commands:\r\n");
     for (unsigned i = 0; i < sizeof(uart_cmd_table)/sizeof(uart_cmd_table[0]); ++i) {
@@ -337,7 +337,7 @@ void HandleHelpCommand(char* args)
     UART_Printf("\r\n");
 }
 
-void HandleSmsCommand(char* param)
+static void HandleSmsCommand(char* param)
 {
     param = trim_whitespace(param);
     if (*param != '\0') {
@@ -362,7 +362,7 @@ void HandleSmsCommand(char* param)
     return;
 }
 
-void HandleSmsLsCommand(char* param)
+static void HandleSmsLsCommand(char* param)
 {
     SMS_Status_t status;
     param = trim_whitespace(param);
@@ -382,7 +382,7 @@ void HandleSmsLsCommand(char* param)
     return;
 }
 
-void HandleSmsRmCommand(char* param)
+static void HandleSmsRmCommand(char* param)
 {
     param = trim_whitespace(param);
     if (*param != '\0') {
@@ -401,19 +401,8 @@ void HandleSmsRmCommand(char* param)
     }
 }
 
-// Print SMS list message
-void HandleSmsListEvent(SMS_Message_Info_t* msg)
-{
-    UART_Printf("\r\n[SMS index: %d]\r\nFrom: %s\r\nTime: %u/%02u/%02u,%02u:%02u:%02u+%02d\r\nContent: %.*s\r\n\r\n",
-                msg->index,
-                msg->phoneNumber,
-                msg->time.year, msg->time.month, msg->time.day,
-                msg->time.hour, msg->time.minute, msg->time.second,
-                msg->time.timeZone,
-                msg->dataLen, msg->data ? (char*)msg->data : "");
-}
 
-void HandleLbsCommand(char* param)
+static void HandleLbsCommand(char* param)
 {
     float lat = 0.0, lon = 0.0;
     int result = Network_GetLbsLocation(&lat, &lon);
@@ -424,7 +413,7 @@ void HandleLbsCommand(char* param)
     }
 }
 
-void HandleAgpsCommand(char* param)
+static void HandleAgpsCommand(char* param)
 {
     int status = gps_PerformAgps();
     if (status == 0) {
@@ -448,4 +437,16 @@ void HandleUartCommand(char* cmd)
         }
     }
     UART_Printf("Unknown command. Type 'help' to see available commands.\r\n");
+}
+
+// Print SMS list message
+void SmsListMessageCallback(SMS_Message_Info_t* msg)
+{
+    UART_Printf("\r\n[SMS index: %d]\r\nFrom: %s\r\nTime: %u/%02u/%02u,%02u:%02u:%02u+%02d\r\nContent: %.*s\r\n\r\n",
+                msg->index,
+                msg->phoneNumber,
+                msg->time.year, msg->time.month, msg->time.day,
+                msg->time.hour, msg->time.minute, msg->time.second,
+                msg->time.timeZone,
+                msg->dataLen, msg->data ? (char*)msg->data : "");
 }

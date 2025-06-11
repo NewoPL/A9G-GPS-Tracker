@@ -21,7 +21,7 @@
 
 #define MODULE_TAG "SMS"
 
-void SMSInit()
+void SmsInit()
 {
     if(!SMS_SetFormat(SMS_FORMAT_TEXT, SIM0))
     {
@@ -63,28 +63,26 @@ static bool GetGoogleMapsLink(char* buf, size_t bufsize)
     return true;
 }
 
-void HandleSmsReceived(API_Event_t* pEvent)
+void SmsReceivedCallback(SMS_Encode_Type_t encodeType,
+                         const char* headerStr,
+                         const char* contentStr,
+                         uint32_t    contentLen)
 {
-    SMS_Encode_Type_t encodeType = pEvent->param1;
-    const char* headerStr = pEvent->pParam1;
-    const char* content = pEvent->pParam2; 
-    uint32_t contentLength = pEvent->param2;    
-
     char cmd[SMS_BODY_MAX_LEN] = {0};
 
     // Process content based on encoding type
     if (encodeType == SMS_ENCODE_TYPE_ASCII) {
         // Direct copy for ASCII encoding
-        strncpy(cmd, (const char*)content, contentLength < sizeof(cmd)-1 ? contentLength : sizeof(cmd)-1);
+        strncpy(cmd, (const char*)contentStr, contentLen < sizeof(cmd)-1 ? contentLen : sizeof(cmd)-1);
     } 
     else if (encodeType == SMS_ENCODE_TYPE_UNICODE) {
         // Extract text from Unicode (UCS-2) encoding
         // In Unicode, each character is 2 bytes, with ASCII characters having 0x00 as the high byte
         uint16_t cmdLen = 0;
-        for (uint16_t i = 0; i < contentLength && cmdLen < sizeof(cmd)-1; i += 2) {
+        for (uint16_t i = 0; i < contentLen && cmdLen < sizeof(cmd)-1; i += 2) {
             // Check if it's ASCII character in Unicode format (high byte is 0)
-            if (i+1 < contentLength && content[i] == 0) {
-                cmd[cmdLen++] = content[i+1];
+            if (i+1 < contentLen && contentStr[i] == 0) {
+                cmd[cmdLen++] = contentStr[i+1];
             }
         }
     }
@@ -94,7 +92,7 @@ void HandleSmsReceived(API_Event_t* pEvent)
     }
     
     trim_whitespace(cmd);
-    LOGI("SMS received header: %s, encodeType: %d, contentLength: %d", headerStr, encodeType, contentLength);
+    LOGI("SMS received header: %s, encodeType: %d, contentLength: %d", headerStr, encodeType, contentLen);
     LOGI("SMS content (processed): '%s'", cmd);
  
     // Parse phone number from header - it's enclosed in quotes and followed by a comma
