@@ -1,15 +1,12 @@
-#include <stdio.h>
 #include <api_os.h>
 #include <api_gps.h>
 #include <api_event.h>
-#include <api_network.h>
 #include <api_hal_pm.h>
 
 #include "system.h"
 #include "gps.h"
 #include "gps_parse.h"
 #include "gps_tracker.h"
-#include "sms_service.h"
 #include "config_store.h"
 #include "config_commands.h"
 #include "network.h"
@@ -189,4 +186,26 @@ void gps_TrackerTask(void *pData)
         if (loop_duration > desired_interval) loop_duration = desired_interval;
         OS_Sleep((desired_interval - loop_duration) * 1000);
     }
+}
+
+// Returns 0 on success, nonzero on failure
+int gps_PerformAgps(void)
+{
+    float latitude = 0.0, longitude = 0.0;
+    int lbs_ok = Network_GetLbsLocation(&longitude, &latitude);
+    if (!lbs_ok) {
+        UART_Printf("LBS get location failed.\r\n");
+        longitude = gps_GetLastLongitude();
+        latitude = gps_GetLastLatitude();
+        UART_Printf("Last known position: lat: %.1f, lon: %.6f\n\r",
+                    latitude, longitude);
+    } else {
+        UART_Printf("Network GSM location: lat: %.1f, lon: %.6f\n\r",
+                    latitude, longitude);
+    }
+    // Call AGPS
+    if (!GPS_AGPS(latitude, longitude, 0, true)) {
+        return -1; // AGPS failed
+    }
+    return 0; // AGPS success
 }

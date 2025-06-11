@@ -6,6 +6,7 @@
 #include <api_os.h>
 #include <api_network.h>
 #include <api_hal_uart.h>
+#include <api_lbs.h>
 
 #include "system.h"
 #include "gps_tracker.h"
@@ -272,5 +273,14 @@ bool NetworkAttachActivate()
         }
     }
     return true;
+}
+
+int Network_GetLbsLocation(float* lat, float* lon)
+{
+    if (!lat || !lon) return -2;
+    if (g_CellInfoCount == 0) return -1;
+    if (!LBS_GetLocation(g_CellInfo, g_CellInfoCount, 15, lon, lat))
+        return -3;
+    return 0;
 }
 

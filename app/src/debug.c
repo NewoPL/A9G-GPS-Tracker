@@ -1,13 +1,7 @@
-#include <stdio.h>
-#include <ctype.h>
-#include <stdarg.h>
-#include <string.h>
-
 #include <api_fs.h>
 #include <api_hal_uart.h>
 
 #include "config_store.h"
-#include "config_commands.h"
 #include "config_validation.h"
 #include "minmea.h"
 #include "debug.h"

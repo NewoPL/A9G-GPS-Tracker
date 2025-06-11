@@ -68,4 +68,11 @@ const char* Network_GetCellInfoString(void);
  */
 void NetworkPrintCellInfo(void);
 
+/**
+ * Get LBS (cell-based) location using current cell info.
+ * Returns 0 on success, nonzero on failure.
+ * lat/lon are output parameters.
+ */
+int Network_GetLbsLocation(float* lat, float* lon);
+
 #endif

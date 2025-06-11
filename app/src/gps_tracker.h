@@ -59,4 +59,6 @@ void  gps_PrintLocation(void);
 
 void  gps_TrackerTask(void *pData);
 
+int   gps_PerformAgps(void);
+
 #endif

@@ -1,14 +1,10 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-
+#include "gps.h"
 #include "gps_tracker.h"
 #include "config_store.h"
 #include "config_validation.h"
 #include "minmea.h"
 #include "utils.h"
 #include "debug.h"
-#include "gps.h"
 
 // Validators
 bool DeviceNameValidate(const char* value);

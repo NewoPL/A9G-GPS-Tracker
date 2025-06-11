@@ -3,7 +3,6 @@
 
 #include <api_os.h>
 #include <api_socket.h>
-#include <api_hal_uart.h>
 #include <api_ssl.h>
 
 #include "http.h"
