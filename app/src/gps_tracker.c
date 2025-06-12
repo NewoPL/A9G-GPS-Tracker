@@ -66,7 +66,7 @@ void gps_PrintLocation(void)
         UART_Printf("%02d.%02d.%02d, ", gpsInfo->rmc.time.hours, gpsInfo->rmc.time.minutes, gpsInfo->rmc.time.seconds);
     }
     UART_Printf("sat visble:%d, sat tracked:%d, err: %.1f, ", gpsInfo->gsv[0].total_sats, gpsInfo->gga.satellites_tracked, GpsTrackerData.accuracy);
-    UART_Printf("lat: %.6f° %c, lon: %.6f° %c, ", (float)fabs(GpsTrackerData.latitude),  (char)((GpsTrackerData.latitude  >= 0) ? 'N' : 'S'),
+    UART_Printf("lat: %.6f deg %c, lon: %.6f deg %c, ", (float)fabs(GpsTrackerData.latitude),  (char)((GpsTrackerData.latitude  >= 0) ? 'N' : 'S'),
                                                   (float)fabs(GpsTrackerData.longitude), (char)((GpsTrackerData.longitude >= 0) ? 'E' : 'W'));
     UART_Printf("alt:%.1f, spd:%.1f, hdg:%.1f\r\n",  GpsTrackerData.altitude, GpsTrackerData.speed, GpsTrackerData.bearing);
     return;
