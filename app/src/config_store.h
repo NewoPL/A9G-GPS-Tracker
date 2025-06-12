@@ -21,28 +21,6 @@
 #define PARAM_GPS_UERE              "gps_uere"
 #define PARAM_GPS_LOGS              "gps_logging"
 
-// Protocol
-typedef enum {
-    PROT_HTTP = 0,
-    PROT_HTTPS
-} t_protocol;
-
-// Log levels
-typedef enum {
-    LOG_LEVEL_NONE = 0,
-    LOG_LEVEL_ERROR,
-    LOG_LEVEL_WARN,
-    LOG_LEVEL_INFO,
-    LOG_LEVEL_DEBUG
-} t_logLevel;
-
-// Log output
-typedef enum {
-    LOGGER_OUTPUT_UART = 0,
-    LOGGER_OUTPUT_TRACE,
-    LOGGER_OUTPUT_FILE
-} t_logOutput;
-
 typedef struct {
     char        imei[MAX_IMEI_LENGTH];
     char        device_name[MAX_DEVICE_NAME_LENGTH];

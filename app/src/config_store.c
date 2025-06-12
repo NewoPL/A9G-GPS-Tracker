@@ -7,12 +7,11 @@
 #include <api_fs.h>
 #include <api_info.h>
 
+#include "utils.h"
 #include "gps_tracker.h"
 #include "config_store.h"
 #include "config_commands.h"
 #include "config_validation.h"
-#include "minmea.h"
-#include "utils.h"
 #include "debug.h"
 
 #define MODULE_TAG "Config"

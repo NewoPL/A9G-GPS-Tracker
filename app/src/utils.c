@@ -2,9 +2,8 @@
 #include <api_fs.h>
 #include <api_inc_time.h>
 
-#include "config_store.h"
-#include "minmea.h"
 #include "utils.h"
+#include "config_store.h"
 #include "debug.h"
 
 int is_leap_year(int year) {

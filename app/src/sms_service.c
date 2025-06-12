@@ -11,12 +11,11 @@
 #include <api_hal_uart.h>
 
 #include "system.h"
+#include "utils.h"
 #include "gps_parse.h"
 #include "gps_tracker.h"
 #include "config_store.h"
 #include "sms_service.h"
-#include "minmea.h"
-#include "utils.h"
 #include "debug.h"
 
 #define MODULE_TAG "SMS"

@@ -55,7 +55,12 @@ float gps_GetLastLongitude(void);
  */
 void  gps_Process(void);
 
-void  gps_PrintLocation(void);
+/**
+ * @brief Print the current GPS location to the selected output.
+ * This function prints the formatted GPS information to UART, Trace, or file depending on the output argument.
+ * @param output The log output type (UART, TRACE, or FILE)
+ */
+void  gps_PrintLocation(t_logOutput output);
 
 void  gps_TrackerTask(void *pData);
 

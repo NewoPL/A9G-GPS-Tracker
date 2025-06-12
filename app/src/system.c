@@ -9,14 +9,13 @@
 #include "gps_parse.h"
 
 #include "system.h"
+#include "utils.h"
 #include "network.h"
 #include "led_handler.h"
 #include "gps_tracker.h"
 #include "sms_service.h"
 #include "config_store.h"
 #include "config_commands.h"
-#include "minmea.h"
-#include "utils.h"
 #include "debug.h"
 
 #define MODULE_TAG "System"

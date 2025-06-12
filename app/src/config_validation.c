@@ -1,9 +1,8 @@
 #include "gps.h"
+#include "utils.h"
 #include "gps_tracker.h"
 #include "config_store.h"
 #include "config_validation.h"
-#include "minmea.h"
-#include "utils.h"
 #include "debug.h"
 
 // Validators

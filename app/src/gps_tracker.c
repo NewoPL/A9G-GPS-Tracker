@@ -4,6 +4,7 @@
 #include <api_hal_pm.h>
 
 #include "system.h"
+#include "utils.h"
 #include "gps.h"
 #include "gps_parse.h"
 #include "gps_tracker.h"
@@ -11,7 +12,6 @@
 #include "config_commands.h"
 #include "network.h"
 #include "http.h"
-#include "utils.h"
 #include "debug.h"
 
 #define MODULE_TAG "GPS"
@@ -52,23 +52,42 @@ void gps_Process(void)
     GpsTrackerData.accuracy  = minmea_tofloat(&gpsInfo->gsa[0].hdop) * 
                                                g_ConfigStore.gps_uere; // User Equivalent Range Error (UERE) in meters 
 
+    if (!gpsInfo->rmc.valid)
+        GpsTrackerData.timestamp = time(NULL);
+
     return;    
 }
 
-void gps_PrintLocation(void)
+void gps_PrintLocation(t_logOutput output)
 {
-    if (!gpsInfo->rmc.valid)
-        UART_Printf("INVALID, ");
-    else 
-    {
-       // Format and display GPS information
-        UART_Printf("%02d.%02d.%02d ", gpsInfo->rmc.date.year, gpsInfo->rmc.date.month, gpsInfo->rmc.date.day);
-        UART_Printf("%02d.%02d.%02d, ", gpsInfo->rmc.time.hours, gpsInfo->rmc.time.minutes, gpsInfo->rmc.time.seconds);
+    void (*print_func)(const char*, ...) = NULL;
+    switch (output) {
+        case LOGGER_OUTPUT_UART:
+            print_func = UART_Printf;
+            break;
+        case LOGGER_OUTPUT_FILE:
+            print_func = FILE_Printf;
+            break;
+        case LOGGER_OUTPUT_TRACE:
+            Trace(1, "LOGGER_OUTPUT_TRACE is not supported in gps_PrintLocation.\r\n");
+            return;
+        default:
+            LOGE("output type: %d", output);
+            return;
     }
-    UART_Printf("sat visble:%d, sat tracked:%d, err: %.1f, ", gpsInfo->gsv[0].total_sats, gpsInfo->gga.satellites_tracked, GpsTrackerData.accuracy);
-    UART_Printf("lat: %.6f deg %c, lon: %.6f deg %c, ", (float)fabs(GpsTrackerData.latitude),  (char)((GpsTrackerData.latitude  >= 0) ? 'N' : 'S'),
-                                                  (float)fabs(GpsTrackerData.longitude), (char)((GpsTrackerData.longitude >= 0) ? 'E' : 'W'));
-    UART_Printf("alt:%.1f, spd:%.1f, hdg:%.1f\r\n",  GpsTrackerData.altitude, GpsTrackerData.speed, GpsTrackerData.bearing);
+
+    if (!gpsInfo->rmc.valid) {
+        print_func("INVALID, ");
+    } 
+    else {
+        print_func("%02d.%02d.%02d ", gpsInfo->rmc.date.year, gpsInfo->rmc.date.month, gpsInfo->rmc.date.day);
+        print_func("%02d.%02d.%02d, ", gpsInfo->rmc.time.hours, gpsInfo->rmc.time.minutes, gpsInfo->rmc.time.seconds);
+    }
+
+    print_func("sat visble:%d, sat tracked:%d, err: %.1f, ", gpsInfo->gsv[0].total_sats, gpsInfo->gga.satellites_tracked, GpsTrackerData.accuracy);
+    print_func("lat: %.6f %c, lon: %.6f %c, ", (float)fabs(GpsTrackerData.latitude),  (char)((GpsTrackerData.latitude  >= 0) ? 'N' : 'S'),
+              (float)fabs(GpsTrackerData.longitude), (char)((GpsTrackerData.longitude >= 0) ? 'E' : 'W'));
+    print_func("alt:%.1f, spd:%.1f, hdg:%.1f\r\n",  GpsTrackerData.altitude, GpsTrackerData.speed, GpsTrackerData.bearing);
     return;
 }
 
@@ -106,13 +125,17 @@ void gps_TrackerTask(void *pData)
         LOGE("get GPS firmware version failed");
     else
         LOGW("GPS firmware version: %s", responseBuffer);
+   
+    RTC_Time_t time;
+    TIME_GetRtcTime(&time);
+    if(!GPS_SetRtcTime(&time)) LOGE("set gps time failed");
 
-    GPS_SetSearchMode(true, false, false, true);
+    GPS_SetSearchMode(true, false, true, true);
 
     // if(!GPS_ClearLog())
     //    LOGE("open file failed, please check tf card");
 
-    // if(!GPS_ClearInfoInFlash())
+    //if(!GPS_ClearInfoInFlash())
     //     LOGE("erase gps fail");
     
     // if(!GPS_SetQzssOutput(false))
@@ -147,7 +170,7 @@ void gps_TrackerTask(void *pData)
             uint8_t percent;
             PM_Voltage(&percent);
 
-            gps_PrintLocation();
+            gps_PrintLocation(g_ConfigStore.logOutput);
 
             responseBuffer[0] = '\0';
             const char* cellInfoStr = Network_GetCellInfoString();
@@ -197,15 +220,17 @@ int gps_PerformAgps(void)
         UART_Printf("LBS get location failed.\r\n");
         longitude = gps_GetLastLongitude();
         latitude = gps_GetLastLatitude();
-        UART_Printf("Last known position: lat: %.1f, lon: %.6f\n\r",
+        UART_Printf("Last known position: lat: %.6f, lon: %.6f\r\n",
                     latitude, longitude);
     } else {
-        UART_Printf("Network GSM location: lat: %.1f, lon: %.6f\n\r",
+        UART_Printf("Network based position: lat: %.6f, lon: %.6f\r\n",
                     latitude, longitude);
     }
     // Call AGPS
     if (!GPS_AGPS(latitude, longitude, 0, true)) {
+        UART_Printf("Assisted GPS start failed\n\r");
         return -1; // AGPS failed
     }
+    UART_Printf("Assisted GPS start succeeded\n\r");
     return 0; // AGPS success
 }
