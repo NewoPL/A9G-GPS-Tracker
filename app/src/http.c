@@ -220,7 +220,7 @@ int Http_Post(bool          secure,
                       "Host: %s\r\n"
                       "Content-Type: application/x-www-form-urlencoded\r\n"
                       "Connection: Keep-Alive\r\n"
-                      "Content-Length: %d\r\n\r\n%s";
+                      "Content-Length: %d\r\n\r\n%s\r\n";
 
     // Calculate the required buffer size
     int bufferLen = snprintf(NULL, 0, fmt, path, hostName, dataLen, data);

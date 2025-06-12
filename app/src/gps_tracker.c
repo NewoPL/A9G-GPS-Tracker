@@ -60,7 +60,7 @@ void gps_Process(void)
 
 void gps_PrintLocation(t_logOutput output)
 {
-    void (*print_func)(const char*, ...) = NULL;
+    int (*print_func)(const char*, ...) = NULL;
     switch (output) {
         case LOGGER_OUTPUT_UART:
             print_func = UART_Printf;
