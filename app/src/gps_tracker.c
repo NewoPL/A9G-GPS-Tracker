@@ -78,11 +78,10 @@ void gps_PrintLocation(t_logOutput output)
 
     if (!gpsInfo->rmc.valid) {
         print_func("INVALID, ");
-    } 
-    
-    print_func("%02d.%02d.%02d ", gpsInfo->rmc.date.year, gpsInfo->rmc.date.month, gpsInfo->rmc.date.day);
-    print_func("%02d.%02d.%02d, ", gpsInfo->rmc.time.hours, gpsInfo->rmc.time.minutes, gpsInfo->rmc.time.seconds);
-    
+    } else {
+        print_func("%02d.%02d.%02d ", gpsInfo->rmc.date.year, gpsInfo->rmc.date.month, gpsInfo->rmc.date.day);
+        print_func("%02d.%02d.%02d, ", gpsInfo->rmc.time.hours, gpsInfo->rmc.time.minutes, gpsInfo->rmc.time.seconds);
+    }
     print_func("sat visble:%d, sat tracked:%d, err: %.1f, ", gpsInfo->gsv[0].total_sats, gpsInfo->gga.satellites_tracked, GpsTrackerData.accuracy);
     print_func("lat: %.6f° %c, lon: %.6f° %c, ", (float)fabs(GpsTrackerData.latitude),  (char)((GpsTrackerData.latitude  >= 0) ? 'N' : 'S'),
               (float)fabs(GpsTrackerData.longitude), (char)((GpsTrackerData.longitude >= 0) ? 'E' : 'W'));
@@ -120,14 +119,14 @@ void gps_TrackerTask(void *pData)
     LOGI("Waiting for GPS");
     while(!IS_GPS_STATUS_ON()) OS_Sleep(2000);
 
+    RTC_Time_t time;
+    TIME_GetRtcTime(&time);
+    if(!GPS_SetRtcTime(&time)) LOGE("set gps time failed");
+
     if(!GPS_GetVersion(responseBuffer, 255))
         LOGE("get GPS firmware version failed");
     else
         LOGW("GPS firmware version: %s", responseBuffer);
-   
-    RTC_Time_t time;
-    TIME_GetRtcTime(&time);
-    if(!GPS_SetRtcTime(&time)) LOGE("set gps time failed");
 
     GPS_SetSearchMode(true, false, true, true);
 
