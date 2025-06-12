@@ -4,6 +4,7 @@
 #include <api_hal_pm.h>
 
 #include "system.h"
+#include "utils.h"
 #include "gps.h"
 #include "gps_parse.h"
 #include "gps_tracker.h"
@@ -11,7 +12,6 @@
 #include "config_commands.h"
 #include "network.h"
 #include "http.h"
-#include "utils.h"
 #include "debug.h"
 
 #define MODULE_TAG "GPS"
@@ -58,20 +58,35 @@ void gps_Process(void)
     return;    
 }
 
-void gps_PrintLocation(void)
+void gps_PrintLocation(t_logOutput output)
 {
-    if (!gpsInfo->rmc.valid)
-        UART_Printf("INVALID, ");
-    else 
-    {
-       // Format and display GPS information
-        UART_Printf("%02d.%02d.%02d ", gpsInfo->rmc.date.year, gpsInfo->rmc.date.month, gpsInfo->rmc.date.day);
-        UART_Printf("%02d.%02d.%02d, ", gpsInfo->rmc.time.hours, gpsInfo->rmc.time.minutes, gpsInfo->rmc.time.seconds);
+    void (*print_func)(const char*, ...) = NULL;
+    switch (output) {
+        case LOGGER_OUTPUT_UART:
+            print_func = UART_Printf;
+            break;
+        case LOGGER_OUTPUT_FILE:
+            print_func = FILE_Printf;
+            break;
+        case LOGGER_OUTPUT_TRACE:
+            Trace(1, "LOGGER_OUTPUT_TRACE is not supported in gps_PrintLocation.\r\n");
+            return;
+        default:
+            LOGE("output type: %d", output);
+            return;
     }
-    UART_Printf("sat visble:%d, sat tracked:%d, err: %.1f, ", gpsInfo->gsv[0].total_sats, gpsInfo->gga.satellites_tracked, GpsTrackerData.accuracy);
-    UART_Printf("lat: %.6f° %c, lon: %.6f° %c, ", (float)fabs(GpsTrackerData.latitude),  (char)((GpsTrackerData.latitude  >= 0) ? 'N' : 'S'),
-                                                  (float)fabs(GpsTrackerData.longitude), (char)((GpsTrackerData.longitude >= 0) ? 'E' : 'W'));
-    UART_Printf("alt:%.1f, spd:%.1f, hdg:%.1f\r\n",  GpsTrackerData.altitude, GpsTrackerData.speed, GpsTrackerData.bearing);
+
+    if (!gpsInfo->rmc.valid) {
+        print_func("INVALID, ");
+    } 
+    
+    print_func("%02d.%02d.%02d ", gpsInfo->rmc.date.year, gpsInfo->rmc.date.month, gpsInfo->rmc.date.day);
+    print_func("%02d.%02d.%02d, ", gpsInfo->rmc.time.hours, gpsInfo->rmc.time.minutes, gpsInfo->rmc.time.seconds);
+    
+    print_func("sat visble:%d, sat tracked:%d, err: %.1f, ", gpsInfo->gsv[0].total_sats, gpsInfo->gga.satellites_tracked, GpsTrackerData.accuracy);
+    print_func("lat: %.6f° %c, lon: %.6f° %c, ", (float)fabs(GpsTrackerData.latitude),  (char)((GpsTrackerData.latitude  >= 0) ? 'N' : 'S'),
+              (float)fabs(GpsTrackerData.longitude), (char)((GpsTrackerData.longitude >= 0) ? 'E' : 'W'));
+    print_func("alt:%.1f, spd:%.1f, hdg:%.1f\r\n",  GpsTrackerData.altitude, GpsTrackerData.speed, GpsTrackerData.bearing);
     return;
 }
 
@@ -154,7 +169,7 @@ void gps_TrackerTask(void *pData)
             uint8_t percent;
             PM_Voltage(&percent);
 
-            gps_PrintLocation();
+            gps_PrintLocation(g_ConfigStore.logOutput);
 
             responseBuffer[0] = '\0';
             const char* cellInfoStr = Network_GetCellInfoString();

@@ -4,14 +4,13 @@
 #include <api_hal_pm.h>
 
 #include "system.h"
+#include "utils.h"
+#include "debug.h"
 #include "network.h"
 #include "gps_tracker.h"
 #include "config_store.h"
 #include "config_commands.h"
 #include "config_validation.h"
-#include "minmea.h"
-#include "utils.h"
-#include "debug.h"
 
 #define MODULE_TAG "Config"
 
@@ -36,7 +35,7 @@ static void HandleSmsRmCommand(char*);
 
 struct uart_cmd_entry {
     const char* cmd;
-    int cmd_len;
+    const int   cmd_len;
     UartCmdHandler handler;
     const char* syntax;
     const char* help;
@@ -61,15 +60,24 @@ static struct uart_cmd_entry uart_cmd_table[] = {
     {"restart",        7, HandleRestartCommand,         "restart",             "Restart the system immediately"},
 };
 
-static unsigned uart_cmd_sorted_idx[sizeof(uart_cmd_table)/sizeof(uart_cmd_table[0])];
-static size_t uart_cmd_table_size = 0;
+/**
+ * This variable holds the size of the uart_cmd_sorted_idx table.
+ * It is initialized in InitUartCmdTableSortedIdx() and used to determine if the table is initialised.
+ */
+static size_t   uart_cmd_table_size = 0;
+
+/**
+ * This array holds the sorted indices of the uart_cmd_table. It is used for the commnad lookup and it ensures that longer (more specific) 
+ * commands are matched before shorter ones. This prevents ambiguous matches when one command is a prefix of another 
+ * (for example, `net` and `net activate`). By sorting the command table by command length (descending), 
+ * the command parser always checks for the most specific match first, resulting in correct and predictable command handling.
+ */
+static uint32_t uart_cmd_sorted_idx[sizeof(uart_cmd_table)/sizeof(uart_cmd_table[0])];
 
 /**
  * Initializes the sorted index for the UART command table.
  * This function sorts the command table based on command length in descending order.
  * It uses a simple selection sort algorithm, which is efficient for small arrays.
- * The sorted index is used to quickly find commands based on their length.
- * This function should be called once before processing commands by HandleUartCommand()
  */
 static void InitUartCmdTableSortedIdx(void)
 {
@@ -276,7 +284,7 @@ static void HandleLocationCommand(char* param)
         UART_Printf("GPS is not active.\r\n");
         return;
     }   
-    gps_PrintLocation();
+    gps_PrintLocation(LOGGER_OUTPUT_UART);
     return;
 }
 

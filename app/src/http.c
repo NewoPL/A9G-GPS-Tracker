@@ -5,6 +5,8 @@
 #include <api_socket.h>
 #include <api_ssl.h>
 
+
+#include "utils.h"
 #include "http.h"
 #include "config_store.h"
 #include "debug.h"

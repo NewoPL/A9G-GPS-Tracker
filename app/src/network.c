@@ -9,11 +9,10 @@
 #include <api_lbs.h>
 
 #include "system.h"
+#include "utils.h"
 #include "gps_tracker.h"
 #include "config_store.h"
 #include "network.h"
-#include "minmea.h"
-#include "utils.h"
 #include "debug.h"
 
 #define MODULE_TAG "Network"

@@ -1,9 +1,9 @@
 #include <api_fs.h>
 #include <api_hal_uart.h>
 
+#include "utils.h"
 #include "config_store.h"
 #include "config_validation.h"
-#include "minmea.h"
 #include "debug.h"
 
 int32_t g_log_file;
