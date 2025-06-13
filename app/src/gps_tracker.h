@@ -2,8 +2,6 @@
 #define GPS_TRACKER_H
 
 #define CONFIG_FILE_PATH          "/config.ini"
-#define GPS_NMEA_LOG_FILE_PATH    "/t/gps_nmea.log"
-
 #define DEFAULT_APN_VALUE         "internet"
 #define DEFAULT_APN_PASS_VALUE    ""
 #define DEFAULT_APN_USER_VALUE    ""
@@ -13,6 +11,8 @@
 #define DEFAULT_DEVICE_NAME       "IMEI"
 #define DEFAULT_GPS_UERE          "5"
 #define DEFAULT_GPS_LOGS          "disabled"
+#define DEFAULT_GPS_LOG_FILE      "/t/gps_nmea.log"
+#define DEFAULT_GPS_PRINT_POS     "disabled"
 #define DEFAULT_LOG_LEVEL         "info"
 #define DEFAULT_LOG_OUTPUT        "uart"
 

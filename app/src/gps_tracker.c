@@ -168,7 +168,8 @@ void gps_TrackerTask(void *pData)
             uint8_t percent;
             PM_Voltage(&percent);
 
-            gps_PrintLocation(g_ConfigStore.logOutput);
+            if (g_ConfigStore.gps_print_pos)
+                gps_PrintLocation(LOGGER_OUTPUT_UART);
 
             responseBuffer[0] = '\0';
             const char* cellInfoStr = Network_GetCellInfoString();

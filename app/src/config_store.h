@@ -8,6 +8,7 @@
 #define MAX_APN_USER_LENGTH         32
 #define MAX_DEVICE_NAME_LENGTH      32
 #define MAX_IMEI_LENGTH             16
+#define MAX_GPS_LOG_PATH_LENGTH     128
 
 #define PARAM_DEVICE_NAME           "device_name"
 #define PARAM_SERVER_ADDR           "server"
@@ -20,6 +21,8 @@
 #define PARAM_LOG_OUTPUT            "log_output"
 #define PARAM_GPS_UERE              "gps_uere"
 #define PARAM_GPS_LOGS              "gps_logging"
+#define PARAM_GPS_LOG_FILE          "gps_log_file"
+#define PARAM_GPS_PRINT_POS         "gps_print_pos"
 
 typedef struct {
     char        imei[MAX_IMEI_LENGTH];
@@ -31,7 +34,9 @@ typedef struct {
     char        apn_user[MAX_APN_USER_LENGTH];
     char        apn_pass[MAX_APN_USER_LENGTH];
     float       gps_uere;
+    bool        gps_print_pos;
     bool        gps_logging;
+    char        gps_log_file[MAX_GPS_LOG_PATH_LENGTH];
     t_logLevel  logLevel;
     t_logOutput logOutput;
 } t_Config;

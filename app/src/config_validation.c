@@ -16,7 +16,9 @@ bool ApnPassValidate(const char* value);
 bool LogLevelValidate(const char* value);
 bool LogOutputValidate(const char* value);
 bool GpsUereValidate(const char* value);
+bool GpsPrintPosValidate(const char* value);
 bool GpsLoggingValidate(const char* value);
+bool GpsLogFileValidate(const char* value);
 
 // Serializers
 const char* StringSerializer(const void* value);
@@ -26,17 +28,19 @@ const char* LogOutputSerializer(const void* value);
 const char* BoolSerializer(const void* value);
 
 const t_config_map g_config_map[] = {
-    {PARAM_DEVICE_NAME,     DEFAULT_DEVICE_NAME,     DeviceNameValidate, StringSerializer,    &g_ConfigStore.device_name},
-    {PARAM_SERVER_ADDR,     DEFAULT_SERVER_ADDR,     ServerValidate,     StringSerializer,    &g_ConfigStore.server_addr},
-    {PARAM_SERVER_PORT,     DEFAULT_SERVER_PORT,     PortValidate,       StringSerializer,    &g_ConfigStore.server_port},
-    {PARAM_SERVER_PROTOCOL, DEFAULT_SERVER_PROTOCOL, ProtocolValidate,   ProtocolSerializer,  &g_ConfigStore.server_protocol},
-    {PARAM_APN,             DEFAULT_APN_VALUE,       ApnValidate,        StringSerializer,    &g_ConfigStore.apn},
-    {PARAM_APN_USER,        DEFAULT_APN_USER_VALUE,  ApnUserValidate,    StringSerializer,    &g_ConfigStore.apn_user},
-    {PARAM_APN_PASS,        DEFAULT_APN_PASS_VALUE,  ApnPassValidate,    StringSerializer,    &g_ConfigStore.apn_pass},
-    {PARAM_LOG_LEVEL,       DEFAULT_LOG_LEVEL,       LogLevelValidate,   LogLevelSerializer,  &g_ConfigStore.logLevel},
-    {PARAM_LOG_OUTPUT,      DEFAULT_LOG_OUTPUT,      LogOutputValidate,  LogOutputSerializer, &g_ConfigStore.logOutput},
-    {PARAM_GPS_UERE,        DEFAULT_GPS_UERE,        GpsUereValidate,    FloatSerializer,     &g_ConfigStore.gps_uere},
-    {PARAM_GPS_LOGS,        DEFAULT_GPS_LOGS,        GpsLoggingValidate, BoolSerializer,      &g_ConfigStore.gps_logging} 
+    {PARAM_DEVICE_NAME,     DEFAULT_DEVICE_NAME,     DeviceNameValidate,  StringSerializer,    &g_ConfigStore.device_name},
+    {PARAM_SERVER_ADDR,     DEFAULT_SERVER_ADDR,     ServerValidate,      StringSerializer,    &g_ConfigStore.server_addr},
+    {PARAM_SERVER_PORT,     DEFAULT_SERVER_PORT,     PortValidate,        StringSerializer,    &g_ConfigStore.server_port},
+    {PARAM_SERVER_PROTOCOL, DEFAULT_SERVER_PROTOCOL, ProtocolValidate,    ProtocolSerializer,  &g_ConfigStore.server_protocol},
+    {PARAM_APN,             DEFAULT_APN_VALUE,       ApnValidate,         StringSerializer,    &g_ConfigStore.apn},
+    {PARAM_APN_USER,        DEFAULT_APN_USER_VALUE,  ApnUserValidate,     StringSerializer,    &g_ConfigStore.apn_user},
+    {PARAM_APN_PASS,        DEFAULT_APN_PASS_VALUE,  ApnPassValidate,     StringSerializer,    &g_ConfigStore.apn_pass},
+    {PARAM_LOG_LEVEL,       DEFAULT_LOG_LEVEL,       LogLevelValidate,    LogLevelSerializer,  &g_ConfigStore.logLevel},
+    {PARAM_LOG_OUTPUT,      DEFAULT_LOG_OUTPUT,      LogOutputValidate,   LogOutputSerializer, &g_ConfigStore.logOutput},
+    {PARAM_GPS_UERE,        DEFAULT_GPS_UERE,        GpsUereValidate,     FloatSerializer,     &g_ConfigStore.gps_uere},
+    {PARAM_GPS_LOGS,        DEFAULT_GPS_LOGS,        GpsLoggingValidate,  BoolSerializer,      &g_ConfigStore.gps_logging},
+    {PARAM_GPS_LOG_FILE,    DEFAULT_GPS_LOG_FILE,    GpsLogFileValidate,  StringSerializer,    &g_ConfigStore.gps_log_file},
+    {PARAM_GPS_PRINT_POS,   DEFAULT_GPS_PRINT_POS,   GpsPrintPosValidate, BoolSerializer,      &g_ConfigStore.gps_print_pos}
 };
 
 const size_t g_config_map_size = sizeof(g_config_map)/sizeof(g_config_map[0]);
@@ -106,7 +110,7 @@ bool PortValidate(const char* value)
     return false;
 }
 
-// APN: non-empty, less than MAX_APN_LENGTH
+// APN: cannot be empty, less than MAX_APN_LENGTH
 bool ApnValidate(const char* value)
 {
     if (!value) return false;
@@ -209,6 +213,29 @@ bool GpsUereValidate(const char* value)
     return false;
 }
 
+// GPS print position: enabled/disabled
+bool GpsPrintPosValidate(const char* value)
+{
+    if (!value) return false;
+    if ((str_case_cmp(value, "0") == 0) ||
+        (str_case_cmp(value, "disable") == 0) ||
+        (str_case_cmp(value, "disabled") == 0) ||
+        (str_case_cmp(value, "false") == 0))
+    {
+        g_ConfigStore.gps_print_pos = false;
+        return true;
+    }
+    if ((str_case_cmp(value, "1") == 0) ||
+        (str_case_cmp(value, "enable") == 0) ||
+        (str_case_cmp(value, "enabled") == 0) ||
+        (str_case_cmp(value, "true") == 0))
+    {
+        g_ConfigStore.gps_print_pos = true;
+        return true;
+    }
+    return false;
+}
+
 bool GpsLoggingValidate(const char* value)
 {
     if (!value) return false;
@@ -218,7 +245,7 @@ bool GpsLoggingValidate(const char* value)
         (str_case_cmp(value, "false") == 0))
     {
         g_ConfigStore.gps_logging = false;
-        GPS_SaveLog(false, GPS_NMEA_LOG_FILE_PATH);
+        GPS_SaveLog(false, g_ConfigStore.gps_log_file);
         return true;
     } 
     if ((str_case_cmp(value, "1") == 0) || 
@@ -227,7 +254,21 @@ bool GpsLoggingValidate(const char* value)
         (str_case_cmp(value, "true") == 0)) 
     {
         g_ConfigStore.gps_logging = true;
-        GPS_SaveLog(true, GPS_NMEA_LOG_FILE_PATH);
+        GPS_SaveLog(true, g_ConfigStore.gps_log_file);
+        return true;
+    }
+    return false;
+}
+
+// GPS log file: non-empty, less than MAX_GPS_LOG_PATH_LENGTH
+bool GpsLogFileValidate(const char* value)
+{
+    if (!value) return false;
+    size_t len = strlen(value);
+    if (len > 0 && len < MAX_GPS_LOG_PATH_LENGTH) {
+        strncpy(g_ConfigStore.gps_log_file, value, MAX_GPS_LOG_PATH_LENGTH-1);
+        g_ConfigStore.gps_log_file[MAX_GPS_LOG_PATH_LENGTH-1] = '\0';
+        GPS_SaveLog(g_ConfigStore.gps_logging, g_ConfigStore.gps_log_file);
         return true;
     }
     return false;
