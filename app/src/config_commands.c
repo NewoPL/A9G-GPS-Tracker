@@ -27,8 +27,6 @@ static void HandleNetworkActivateCommand(char*);
 static void HandleNetworkStatusCommand(char*);
 static void HandleNetworkDeactivateCommand(char*);
 static void HandleLocationCommand(char*);
-static void HandleLbsCommand(char*);
-static void HandleAgpsCommand(char*);
 static void HandleSmsCommand(char*);
 static void HandleSmsLsCommand(char*);
 static void HandleSmsRmCommand(char*);
@@ -55,8 +53,6 @@ static struct uart_cmd_entry uart_cmd_table[] = {
     {"sms ls",         6, HandleSmsLsCommand,           "sms ls <all|read|unread>", "list SMS messages ()"},
     {"sms rm",         6, HandleSmsRmCommand,           "sms rm <index|all>",  "remove SMS message (rm <index>) or remove all messages (rm all)"},
     {"location",       8, HandleLocationCommand,        "location",            "Show the last known GPS position"},
-    {"lbs",            3, HandleLbsCommand,             "lbs",                 "Get and print location based on seen base stations (LBS)"},
-    {"agps",           4, HandleAgpsCommand,            "agps",                "Perform assisted GPS using latest LBS location"},
     {"restart",        7, HandleRestartCommand,         "restart",             "Restart the system immediately"},
 };
 
@@ -409,27 +405,6 @@ static void HandleSmsRmCommand(char* param)
     }
 }
 
-
-static void HandleLbsCommand(char* param)
-{
-    float lat = 0.0, lon = 0.0;
-    int result = Network_GetLbsLocation(&lat, &lon);
-    if (result == 0) {
-        UART_Printf("LBS Location: Latitude: %f, Longitude: %f\r\n", lat, lon);
-    } else {
-        UART_Printf("Failed to get LBS location (error: %d)\r\n", result);
-    }
-}
-
-static void HandleAgpsCommand(char* param)
-{
-    int status = gps_PerformAgps();
-    if (status == 0) {
-        UART_Printf("AGPS success\r\n");
-    } else {
-        UART_Printf("AGPS failed\r\n");
-    }
-}
 
 void HandleUartCommand(char* cmd)
 {

@@ -31,6 +31,12 @@ extern uint32_t g_trackerloop_tick;
  */
 void  gps_Init(void);
 
+/**
+ * @brief Check if the GPS data is valid.
+ * This function checks the validity of the GPS data by verifying the status
+ * reported by the GPS module.
+ * @return true if the GPS data is valid, false otherwise
+ */
 bool  gps_isValid(void);
 
 /**
@@ -62,8 +68,13 @@ void  gps_Process(void);
  */
 void  gps_PrintLocation(t_logOutput output);
 
+/**
+ * @brief The main task for the GPS tracker.
+ * This function runs in a loop, checking for GPS and GSM status,
+ * and sending location updates to the server at specified intervals.
+ * It should be started as a separate task in the system.
+ * @param pData Pointer to task data (not used)
+ */
 void  gps_TrackerTask(void *pData);
-
-int   gps_PerformAgps(void);
 
 #endif

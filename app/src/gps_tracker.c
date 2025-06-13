@@ -209,26 +209,3 @@ void gps_TrackerTask(void *pData)
     }
 }
 
-// Returns 0 on success, nonzero on failure
-int gps_PerformAgps(void)
-{
-    float latitude = 0.0, longitude = 0.0;
-    int lbs_ok = Network_GetLbsLocation(&longitude, &latitude);
-    if (!lbs_ok) {
-        UART_Printf("LBS get location failed.\r\n");
-        longitude = gps_GetLastLongitude();
-        latitude = gps_GetLastLatitude();
-        UART_Printf("Last known position: lat: %.6f, lon: %.6f\r\n",
-                    latitude, longitude);
-    } else {
-        UART_Printf("Network based position: lat: %.6f, lon: %.6f\r\n",
-                    latitude, longitude);
-    }
-    // Call AGPS
-    if (!GPS_AGPS(latitude, longitude, 0, true)) {
-        UART_Printf("Assisted GPS start failed\n\r");
-        return -1; // AGPS failed
-    }
-    UART_Printf("Assisted GPS start succeeded\n\r");
-    return 0; // AGPS success
-}
