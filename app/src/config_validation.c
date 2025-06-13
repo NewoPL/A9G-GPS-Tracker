@@ -40,7 +40,7 @@ const t_config_map g_config_map[] = {
     {PARAM_GPS_UERE,        DEFAULT_GPS_UERE,        GpsUereValidate,     FloatSerializer,     &g_ConfigStore.gps_uere},
     {PARAM_GPS_LOGS,        DEFAULT_GPS_LOGS,        GpsLoggingValidate,  BoolSerializer,      &g_ConfigStore.gps_logging},
     {PARAM_GPS_LOG_FILE,    DEFAULT_GPS_LOG_FILE,    GpsLogFileValidate,  StringSerializer,    &g_ConfigStore.gps_log_file},
-    {PARAM_GPS_PRINT_POS,   DEFAULT_GPS_PRINT_POS,   GpsPrintPosValidate, BoolSerializer,      &g_ConfigStore.gps_print_pos}
+    {PARAM_GPS_PRINT_POS,   DEFAULT_GPS_PRINT_POS,   GpsPrintPosValidate, BoolSerializer,      &g_ConfigStore.gps_print_pos},
 };
 
 const size_t g_config_map_size = sizeof(g_config_map)/sizeof(g_config_map[0]);
@@ -327,6 +327,7 @@ const char* LogOutputSerializer(const void* value)
 const char* BoolSerializer(const void* value)
 {
     if (!value) return NULL;
-    snprintf(serializer_buf, sizeof(serializer_buf), "%s", *((const int*)value) ? "true" : "false");
+    // Cast to unsigned char for bool fields (avoids alignment issues)
+    snprintf(serializer_buf, sizeof(serializer_buf), "%s", (*(const unsigned char*)value) ? "true" : "false");
     return serializer_buf;
 }
