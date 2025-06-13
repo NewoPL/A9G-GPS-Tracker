@@ -1,20 +1,17 @@
-#include <stdio.h>
 #include <api_os.h>
 #include <api_gps.h>
 #include <api_event.h>
-#include <api_network.h>
 #include <api_hal_pm.h>
 
 #include "system.h"
+#include "utils.h"
 #include "gps.h"
 #include "gps_parse.h"
 #include "gps_tracker.h"
-#include "sms_service.h"
 #include "config_store.h"
 #include "config_commands.h"
 #include "network.h"
 #include "http.h"
-#include "utils.h"
 #include "debug.h"
 
 #define MODULE_TAG "GPS"
@@ -55,23 +52,40 @@ void gps_Process(void)
     GpsTrackerData.accuracy  = minmea_tofloat(&gpsInfo->gsa[0].hdop) * 
                                                g_ConfigStore.gps_uere; // User Equivalent Range Error (UERE) in meters 
 
+    if (!gpsInfo->rmc.valid)
+        GpsTrackerData.timestamp = time(NULL);
+
     return;    
 }
 
-void gps_PrintLocation(void)
+void gps_PrintLocation(t_logOutput output)
 {
-    if (!gpsInfo->rmc.valid)
-        UART_Printf("INVALID, ");
-    else 
-    {
-       // Format and display GPS information
-        UART_Printf("%02d.%02d.%02d ", gpsInfo->rmc.date.year, gpsInfo->rmc.date.month, gpsInfo->rmc.date.day);
-        UART_Printf("%02d.%02d.%02d, ", gpsInfo->rmc.time.hours, gpsInfo->rmc.time.minutes, gpsInfo->rmc.time.seconds);
+    int (*print_func)(const char*, ...) = NULL;
+    switch (output) {
+        case LOGGER_OUTPUT_UART:
+            print_func = UART_Printf;
+            break;
+        case LOGGER_OUTPUT_FILE:
+            print_func = FILE_Printf;
+            break;
+        case LOGGER_OUTPUT_TRACE:
+            Trace(1, "LOGGER_OUTPUT_TRACE is not supported in gps_PrintLocation.\r\n");
+            return;
+        default:
+            LOGE("output type: %d", output);
+            return;
     }
-    UART_Printf("sat visble:%d, sat tracked:%d, err: %.1f, ", gpsInfo->gsv[0].total_sats, gpsInfo->gga.satellites_tracked, GpsTrackerData.accuracy);
-    UART_Printf("lat: %.6f° %c, lon: %.6f° %c, ", (float)fabs(GpsTrackerData.latitude),  (char)((GpsTrackerData.latitude  >= 0) ? 'N' : 'S'),
-                                                  (float)fabs(GpsTrackerData.longitude), (char)((GpsTrackerData.longitude >= 0) ? 'E' : 'W'));
-    UART_Printf("alt:%.1f, spd:%.1f, hdg:%.1f\r\n",  GpsTrackerData.altitude, GpsTrackerData.speed, GpsTrackerData.bearing);
+
+    if (!gpsInfo->rmc.valid) {
+        print_func("INVALID, ");
+    } else {
+        print_func("%02d.%02d.%02d ", gpsInfo->rmc.date.year, gpsInfo->rmc.date.month, gpsInfo->rmc.date.day);
+        print_func("%02d.%02d.%02d, ", gpsInfo->rmc.time.hours, gpsInfo->rmc.time.minutes, gpsInfo->rmc.time.seconds);
+    }
+    print_func("sat visble:%d, sat tracked:%d, err: %.1f, ", gpsInfo->gsv[0].total_sats, gpsInfo->gga.satellites_tracked, GpsTrackerData.accuracy);
+    print_func("lat: %.6f %c, lon: %.6f %c, ", (float)fabs(GpsTrackerData.latitude),  (char)((GpsTrackerData.latitude  >= 0) ? 'N' : 'S'),
+              (float)fabs(GpsTrackerData.longitude), (char)((GpsTrackerData.longitude >= 0) ? 'E' : 'W'));
+    print_func("alt:%.1f, spd:%.1f, hdg:%.1f\r\n",  GpsTrackerData.altitude, GpsTrackerData.speed, GpsTrackerData.bearing);
     return;
 }
 
@@ -105,17 +119,21 @@ void gps_TrackerTask(void *pData)
     LOGI("Waiting for GPS");
     while(!IS_GPS_STATUS_ON()) OS_Sleep(2000);
 
+    RTC_Time_t time;
+    TIME_GetRtcTime(&time);
+    if(!GPS_SetRtcTime(&time)) LOGE("set gps time failed");
+
     if(!GPS_GetVersion(responseBuffer, 255))
         LOGE("get GPS firmware version failed");
     else
         LOGW("GPS firmware version: %s", responseBuffer);
 
-    GPS_SetSearchMode(true, false, false, true);
+    GPS_SetSearchMode(true, false, true, true);
 
     // if(!GPS_ClearLog())
     //    LOGE("open file failed, please check tf card");
 
-    // if(!GPS_ClearInfoInFlash())
+    //if(!GPS_ClearInfoInFlash())
     //     LOGE("erase gps fail");
     
     // if(!GPS_SetQzssOutput(false))
@@ -136,59 +154,59 @@ void gps_TrackerTask(void *pData)
     if(!GPS_SetOutputInterval(1000))
         LOGE("set GPS interval failed");
 
+    // Target loop period in seconds. It is set to:
+    // 10s when sending data to server 
+    // 1s when waiting for the internet connection or a GPS fix
+    uint32_t desired_interval = 0;
+    
     while(1)
     {
         g_trackerloop_tick = time(NULL);
-        
-        if(IS_GPS_STATUS_ON()) // && gps_isValid)
+
+        if(IS_GPS_STATUS_ON() && IS_GSM_ACTIVE())
         {
             uint8_t percent;
             PM_Voltage(&percent);
 
-            gps_PrintLocation();
+            if (g_ConfigStore.gps_print_pos)
+                gps_PrintLocation(LOGGER_OUTPUT_UART);
 
             responseBuffer[0] = '\0';
-            if (strlen(g_cellInfo) != 0) {
-                 snprintf(responseBuffer, sizeof(responseBuffer),"&cell=%s", g_cellInfo);
-            }
+            const char* cellInfoStr = Network_GetCellInfoString();
+            if (cellInfoStr && strlen(cellInfoStr) != 0)
+                snprintf(responseBuffer, sizeof(responseBuffer),"&cell=%s", cellInfoStr);
 
             snprintf(requestBuffer, sizeof(requestBuffer),
-                     "id=%s&valid=%d&timestamp=%d&lat=%f&lon=%f&speed=%1.f&bearing=%.1f&altitude=%.1f&accuracy=%.1f%s&batt=%d",
-                     g_ConfigStore.device_name, gpsInfo->rmc.valid, GpsTrackerData.timestamp,
-                     GpsTrackerData.latitude, GpsTrackerData.longitude, 
-                     GpsTrackerData.speed, GpsTrackerData.bearing, GpsTrackerData.altitude, 
-                     GpsTrackerData.accuracy, responseBuffer, percent);
+                "id=%s&valid=%d&timestamp=%d&lat=%f&lon=%f&speed=%1.f&bearing=%.1f&altitude=%.1f&accuracy=%.1f%s&batt=%d",
+                g_ConfigStore.device_name, gpsInfo->rmc.valid, 
+                GpsTrackerData.timestamp, GpsTrackerData.latitude, GpsTrackerData.longitude, 
+                GpsTrackerData.speed,     GpsTrackerData.bearing,  GpsTrackerData.altitude, 
+                GpsTrackerData.accuracy, responseBuffer, percent);
             requestBuffer[sizeof(requestBuffer) - 1] = '\0';
 
-            if(IS_GSM_ACTIVE())
-            {
-                const char* serverName = g_ConfigStore.server_addr;
-                const char* serverPort = g_ConfigStore.server_port;
-                bool secure = (g_ConfigStore.server_protocol == PROT_HTTPS);
-                int result = Http_Post(secure, serverName, serverPort, "/", 
-                                       requestBuffer, strlen(requestBuffer),
-                                       responseBuffer, sizeof(responseBuffer));
-                if (result < 0)
-                    LOGE("FAILED to send the location to the server. err: %d", result);
-                else
-                    LOGI("Sent location to %s://%s:%s", (secure ? "https":"http"), serverName, serverPort);
-            }
+            const char* serverName = g_ConfigStore.server_addr;
+            const char* serverPort = g_ConfigStore.server_port;
+            const bool  secure = (g_ConfigStore.server_protocol == PROT_HTTPS);
+            int result = Http_Post(secure, serverName, serverPort, "/", 
+                                   requestBuffer, strlen(requestBuffer),
+                                   responseBuffer, sizeof(responseBuffer));
+            if (result < 0)
+                LOGE("FAILED to send the location to the server. err: %d", result);
             else
-            {
-                LOGE("No internet registered:%d, active:%d", 
-                     IS_GSM_REGISTERED(), IS_GSM_ACTIVE());           }
+                LOGI("Sent location to %s://%s:%s", (secure ? "https":"http"), serverName, serverPort);
+            
+            // wait 10 seconds before next loop iteration
+            desired_interval = 10; 
         }
         else
         {
-            LOGE("No GPS fix. SAT visible: %d, SAT tracked:%d", 
-                 gpsInfo->gsv[0].total_sats, gpsInfo->gga.satellites_tracked);
+            // if there is no internet do not wait too long for the next loop
+            desired_interval = 1;
         }
 
-        uint32_t loop_end = time(NULL);
-        uint32_t loop_duration = (loop_end - g_trackerloop_tick);
-        uint32_t desired_interval = 10; // target loop period in seconds (e.g., 10 seconds)
-
+        uint32_t loop_duration = (time(NULL) - g_trackerloop_tick);
         if (loop_duration > desired_interval) loop_duration = desired_interval;
         OS_Sleep((desired_interval - loop_duration) * 1000);
     }
 }
+

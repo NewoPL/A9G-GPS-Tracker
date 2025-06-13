@@ -4,6 +4,6 @@
 #include "config_store.h"
 
 void HandleUartCommand(char* cmd);
-void HandleSmsListEvent(SMS_Message_Info_t* msg);
+void SmsListMessageCallback(SMS_Message_Info_t* msg);
 
 #endif

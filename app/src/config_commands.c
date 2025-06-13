@@ -1,42 +1,39 @@
-#include <stdio.h>
-#include <stdlib.h>
-
 #include <api_fs.h>
 #include <api_sms.h>
 #include <api_network.h>
 #include <api_hal_pm.h>
 
-#include "gps_parse.h"
 #include "system.h"
+#include "utils.h"
+#include "debug.h"
 #include "network.h"
 #include "gps_tracker.h"
 #include "config_store.h"
 #include "config_commands.h"
 #include "config_validation.h"
-#include "minmea.h"
-#include "utils.h"
-#include "debug.h"
+
+#define MODULE_TAG "Config"
 
 typedef void (*UartCmdHandler)(char*);
 
-void HandleHelpCommand(char*);
-void HandleLsCommand(char*);
-void HandleRemoveFileCommand(char*);
-void HandleSetCommand(char*);
-void HandleGetCommand(char*);
-void HandleTailCommand(char*);
-void HandleRestartCommand(char*);
-void HandleNetworkActivateCommand(char*);
-void HandleNetworkStatusCommand(char*);
-void HandleNetworkDeactivateCommand(char*);
-void HandleLocationCommand(char*);
-void HandleSmsCommand(char*);
-void HandleSmsLsCommand(char*);
-void HandleSmsRmCommand(char*);
+static void HandleHelpCommand(char*);
+static void HandleLsCommand(char*);
+static void HandleRemoveFileCommand(char*);
+static void HandleSetCommand(char*);
+static void HandleGetCommand(char*);
+static void HandleTailCommand(char*);
+static void HandleRestartCommand(char*);
+static void HandleNetworkActivateCommand(char*);
+static void HandleNetworkStatusCommand(char*);
+static void HandleNetworkDeactivateCommand(char*);
+static void HandleLocationCommand(char*);
+static void HandleSmsCommand(char*);
+static void HandleSmsLsCommand(char*);
+static void HandleSmsRmCommand(char*);
 
 struct uart_cmd_entry {
     const char* cmd;
-    int cmd_len;
+    const int   cmd_len;
     UartCmdHandler handler;
     const char* syntax;
     const char* help;
@@ -59,15 +56,24 @@ static struct uart_cmd_entry uart_cmd_table[] = {
     {"restart",        7, HandleRestartCommand,         "restart",             "Restart the system immediately"},
 };
 
-static unsigned uart_cmd_sorted_idx[sizeof(uart_cmd_table)/sizeof(uart_cmd_table[0])];
-static size_t uart_cmd_table_size = 0;
+/**
+ * This variable holds the size of the uart_cmd_sorted_idx table.
+ * It is initialized in InitUartCmdTableSortedIdx() and used to determine if the table is initialised.
+ */
+static size_t   uart_cmd_table_size = 0;
+
+/**
+ * This array holds the sorted indices of the uart_cmd_table. It is used for the commnad lookup and it ensures that longer (more specific) 
+ * commands are matched before shorter ones. This prevents ambiguous matches when one command is a prefix of another 
+ * (for example, `net` and `net activate`). By sorting the command table by command length (descending), 
+ * the command parser always checks for the most specific match first, resulting in correct and predictable command handling.
+ */
+static uint32_t uart_cmd_sorted_idx[sizeof(uart_cmd_table)/sizeof(uart_cmd_table[0])];
 
 /**
  * Initializes the sorted index for the UART command table.
  * This function sorts the command table based on command length in descending order.
  * It uses a simple selection sort algorithm, which is efficient for small arrays.
- * The sorted index is used to quickly find commands based on their length.
- * This function should be called once before processing commands by HandleUartCommand()
  */
 static void InitUartCmdTableSortedIdx(void)
 {
@@ -88,7 +94,7 @@ static void InitUartCmdTableSortedIdx(void)
     }
 }
 
-void HandleSetCommand(char* param)
+static void HandleSetCommand(char* param)
 {
     param = trim_whitespace(param);
     if (!*param) {
@@ -125,7 +131,7 @@ void HandleSetCommand(char* param)
     return;
 }
 
-void HandleGetCommand(char* param)
+static void HandleGetCommand(char* param)
 {
     param = trim_whitespace(param);
 
@@ -151,7 +157,7 @@ void HandleGetCommand(char* param)
     return;
 }
 
-void HandleLsCommand(char* path)
+static void HandleLsCommand(char* path)
 {
     path = trim_whitespace(path);
     if (!path || path[0] == '\0') path = "/";
@@ -203,7 +209,7 @@ void HandleLsCommand(char* path)
     API_FS_CloseDir(dir);
 }
 
-void HandleRemoveFileCommand(char* path)
+static void HandleRemoveFileCommand(char* path)
 {
     path = trim_whitespace(path);
     if (!path || path[0] == '\0') {
@@ -218,7 +224,7 @@ void HandleRemoveFileCommand(char* path)
     }
 }
 
-void HandleTailCommand(char* args)
+static void HandleTailCommand(char* args)
 {
     int bytes = 500;
     char* file_path = trim_whitespace(args);
@@ -267,23 +273,22 @@ void HandleTailCommand(char* args)
     API_FS_Close(fd);
 }
 
-void HandleLocationCommand(char* param)
+static void HandleLocationCommand(char* param)
 {
     // First check if GPS is active
     if (!IS_GPS_STATUS_ON()) {
         UART_Printf("GPS is not active.\r\n");
         return;
     }   
-    gps_PrintLocation();
+    gps_PrintLocation(LOGGER_OUTPUT_UART);
     return;
 }
 
-void HandleNetworkStatusCommand(char* param)
+static void HandleNetworkStatusCommand(char* param)
 {
     UART_Printf("GSM Network registered: %s, active: %s\r\n",
                 IS_GSM_REGISTERED() ? "true" : "false",
                 IS_GSM_ACTIVE() ? "true" : "false");
-    
     // Get and display IP address if network is active
     if (IS_GSM_ACTIVE()) {
         char ip_address[16] = {0};
@@ -295,20 +300,11 @@ void HandleNetworkStatusCommand(char* param)
     } else {
         UART_Printf("IP address: not available\r\n");
     }
-
-    if (g_cellInfo[0] != 0) {
-        UART_Printf("Cell info: %s\r\n", g_cellInfo);
-        // Try to parse and print cell info fields if present
-        int mcc = 0, mnc = 0, lac = 0, cellid = 0, rxlev = 0;
-        if (sscanf(g_cellInfo, "%3d,%3d,%d,%d,%d", &mcc, &mnc, &lac, &cellid, &rxlev) == 5) {
-            UART_Printf("  MCC: %03d\r\n  MNC: %03d\r\n  LAC: %d\r\n  CellID: %d\r\n  RxLev: %d\r\n",
-                mcc, mnc, lac, cellid, rxlev);
-        }
-    } else
-        UART_Printf("Cell info not available\r\n");
+    // Print cell info using network module function
+    NetworkPrintCellInfo();
 }
 
-void HandleNetworkActivateCommand(char* param)
+static void HandleNetworkActivateCommand(char* param)
 {
     if (NetworkAttachActivate()) {
         UART_Printf("Network activated.\r\n");
@@ -317,7 +313,7 @@ void HandleNetworkActivateCommand(char* param)
     }
 }
 
-void HandleNetworkDeactivateCommand(char* param)
+static void HandleNetworkDeactivateCommand(char* param)
 {
     if (Network_StartDeactive(1)) {
         UART_Printf("Network deactivated.\r\n");
@@ -326,13 +322,13 @@ void HandleNetworkDeactivateCommand(char* param)
     }
 }
 
-void HandleRestartCommand(char* args)
+static void HandleRestartCommand(char* args)
 {
     UART_Printf("System restarting...\r\n");
     PM_Restart();
 }
 
-void HandleHelpCommand(char* args)
+static void HandleHelpCommand(char* args)
 {
     UART_Printf("\r\nAvailable commands:\r\n");
     for (unsigned i = 0; i < sizeof(uart_cmd_table)/sizeof(uart_cmd_table[0]); ++i) {
@@ -345,7 +341,7 @@ void HandleHelpCommand(char* args)
     UART_Printf("\r\n");
 }
 
-void HandleSmsCommand(char* param)
+static void HandleSmsCommand(char* param)
 {
     param = trim_whitespace(param);
     if (*param != '\0') {
@@ -370,7 +366,7 @@ void HandleSmsCommand(char* param)
     return;
 }
 
-void HandleSmsLsCommand(char* param)
+static void HandleSmsLsCommand(char* param)
 {
     SMS_Status_t status;
     param = trim_whitespace(param);
@@ -390,7 +386,7 @@ void HandleSmsLsCommand(char* param)
     return;
 }
 
-void HandleSmsRmCommand(char* param)
+static void HandleSmsRmCommand(char* param)
 {
     param = trim_whitespace(param);
     if (*param != '\0') {
@@ -409,17 +405,6 @@ void HandleSmsRmCommand(char* param)
     }
 }
 
-// Print SMS list message
-void HandleSmsListEvent(SMS_Message_Info_t* msg)
-{
-    UART_Printf("\r\n[SMS index: %d]\r\nFrom: %s\r\nTime: %u/%02u/%02u,%02u:%02u:%02u+%02d\r\nContent: %.*s\r\n\r\n",
-                msg->index,
-                msg->phoneNumber,
-                msg->time.year, msg->time.month, msg->time.day,
-                msg->time.hour, msg->time.minute, msg->time.second,
-                msg->time.timeZone,
-                msg->dataLen, msg->data ? (char*)msg->data : "");
-}
 
 void HandleUartCommand(char* cmd)
 {
@@ -435,4 +420,16 @@ void HandleUartCommand(char* cmd)
         }
     }
     UART_Printf("Unknown command. Type 'help' to see available commands.\r\n");
+}
+
+// Print SMS list message
+void SmsListMessageCallback(SMS_Message_Info_t* msg)
+{
+    UART_Printf("\r\n[SMS index: %d]\r\nFrom: %s\r\nTime: %u/%02u/%02u,%02u:%02u:%02u+%02d\r\nContent: %.*s\r\n\r\n",
+                msg->index,
+                msg->phoneNumber,
+                msg->time.year, msg->time.month, msg->time.day,
+                msg->time.hour, msg->time.minute, msg->time.second,
+                msg->time.timeZone,
+                msg->dataLen, msg->data ? (char*)msg->data : "");
 }

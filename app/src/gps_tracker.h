@@ -2,8 +2,6 @@
 #define GPS_TRACKER_H
 
 #define CONFIG_FILE_PATH          "/config.ini"
-#define GPS_NMEA_LOG_FILE_PATH    "/t/gps_nmea.log"
-
 #define DEFAULT_APN_VALUE         "internet"
 #define DEFAULT_APN_PASS_VALUE    ""
 #define DEFAULT_APN_USER_VALUE    ""
@@ -13,6 +11,8 @@
 #define DEFAULT_DEVICE_NAME       "IMEI"
 #define DEFAULT_GPS_UERE          "5"
 #define DEFAULT_GPS_LOGS          "disabled"
+#define DEFAULT_GPS_LOG_FILE      "/t/gps_nmea.log"
+#define DEFAULT_GPS_PRINT_POS     "disabled"
 #define DEFAULT_LOG_LEVEL         "info"
 #define DEFAULT_LOG_OUTPUT        "uart"
 
@@ -31,6 +31,12 @@ extern uint32_t g_trackerloop_tick;
  */
 void  gps_Init(void);
 
+/**
+ * @brief Check if the GPS data is valid.
+ * This function checks the validity of the GPS data by verifying the status
+ * reported by the GPS module.
+ * @return true if the GPS data is valid, false otherwise
+ */
 bool  gps_isValid(void);
 
 /**
@@ -55,8 +61,20 @@ float gps_GetLastLongitude(void);
  */
 void  gps_Process(void);
 
-void  gps_PrintLocation(void);
+/**
+ * @brief Print the current GPS location to the selected output.
+ * This function prints the formatted GPS information to UART, Trace, or file depending on the output argument.
+ * @param output The log output type (UART, TRACE, or FILE)
+ */
+void  gps_PrintLocation(t_logOutput output);
 
+/**
+ * @brief The main task for the GPS tracker.
+ * This function runs in a loop, checking for GPS and GSM status,
+ * and sending location updates to the server at specified intervals.
+ * It should be started as a separate task in the system.
+ * @param pData Pointer to task data (not used)
+ */
 void  gps_TrackerTask(void *pData);
 
 #endif

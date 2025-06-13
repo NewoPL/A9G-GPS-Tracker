@@ -6,8 +6,10 @@
 #include <api_os.h>
 #include <api_network.h>
 #include <api_hal_uart.h>
+#include <api_lbs.h>
 
 #include "system.h"
+#include "utils.h"
 #include "gps_tracker.h"
 #include "config_store.h"
 #include "network.h"
@@ -15,15 +17,26 @@
 
 #define MODULE_TAG "Network"
 
-uint8_t g_RSSI = 0;
-char    g_cellInfo[128] = "\0";
-static Network_Status_t g_NetworkStatus = 0;
-static Network_PDP_Context_t NetContextArr[2]; // Two-element array: [0]=real APN, [1]=dummy APN
 static bool apn_workaround_pending = false;  
+#define MAX_CELLINFO_COUNT 8
+
+static Network_Status_t      g_NetworkStatus = 0;
+static Network_PDP_Context_t g_NetContextArr[2]; // Two-element array: [0]=real APN, [1]=dummy APN
+static Network_Location_t    g_CellInfo[MAX_CELLINFO_COUNT];
+static uint8_t               g_CellInfoCount = 0;
+static uint8_t               g_RSSI = 0;
+
+/*
+ * @brief Global variable to store cell information.
+ *
+ * This variable is used to hold the formatted cell information string
+ * that can be accessed by other parts of the application.  
+ */
+static char g_cellInfoStr[128] = "\0";
 
 static void NetworkMonitorTimer(HANDLE);
 
-void NetworkMonitor(void* param)
+static void NetworkMonitor(void* param)
 {
     if (param == NULL) return;
 
@@ -42,11 +55,11 @@ void NetworkMonitor(void* param)
 
     if (IS_GSM_REGISTERED()) {
         if(!Network_GetCellInfoRequst()) {
-            g_cellInfo[0] = '\0';
+            g_cellInfoStr[0] = '\0';
             LOGE("network get cell info fail");
         }
     } else {
-        g_cellInfo[0] = '\0';
+        g_cellInfoStr[0] = '\0';
     }
     HANDLE taskHandle = (HANDLE)param;
     NetworkMonitorTimer(taskHandle);
@@ -57,12 +70,48 @@ static void NetworkMonitorTimer(HANDLE taskHandle)
     OS_StartCallbackTimer(taskHandle, NETWORK_MONITOR_INTERVAL_MS, NetworkMonitor, (void*)taskHandle);
 }
 
+void NetworkSigQualityCallback(int CSQ)
+{
+    g_RSSI = csq_to_percent(CSQ);
+    LOGD("Signal Quality: %d%%", g_RSSI);
+    return;
+}
+
 void NetworkCellInfoCallback(Network_Location_t* loc, int number)
 {
-    g_cellInfo[0] = '\0';
+    g_cellInfoStr[0] = '\0';
+    g_CellInfoCount = 0;
     if (number <= 0) return;
-    snprintf(g_cellInfo,  sizeof(g_cellInfo), "%u%u%u,%u%u%u,%u,%u,%d",
-             loc->sMcc[0], loc->sMcc[1], loc->sMcc[2], loc->sMnc[0], loc->sMnc[1], loc->sMnc[2], loc->sLac, loc->sCellID, loc->iRxLev);
+    int count = (number > MAX_CELLINFO_COUNT) ? MAX_CELLINFO_COUNT : number;
+    for (int i = 0; i < count; ++i) {
+        g_CellInfo[i] = loc[i];
+    }
+    g_CellInfoCount = count;
+    // Format the serving cell for UART output (first entry)
+    snprintf(g_cellInfoStr, sizeof(g_cellInfoStr), "%u%u%u,%u%u%u,%u,%u,%d",
+             g_CellInfo[0].sMcc[0], g_CellInfo[0].sMcc[1], g_CellInfo[0].sMcc[2],
+             g_CellInfo[0].sMnc[0], g_CellInfo[0].sMnc[1], g_CellInfo[0].sMnc[2],
+             g_CellInfo[0].sLac, g_CellInfo[0].sCellID, g_CellInfo[0].iRxLev);
+}
+
+void NetworkPrintCellInfo(void)
+{
+    if (g_CellInfoCount > 0) {
+        UART_Printf("Base stations seen: %d\r\n", g_CellInfoCount);
+        for (uint8_t i = 0; i < g_CellInfoCount; ++i) {
+            UART_Printf("  [%d] MCC: %u%u%u, MNC: %u%u%u, LAC: %u, CellID: %u, RxLev: %d\r\n", i,
+                g_CellInfo[i].sMcc[0], g_CellInfo[i].sMcc[1], g_CellInfo[i].sMcc[2],
+                g_CellInfo[i].sMnc[0], g_CellInfo[i].sMnc[1], g_CellInfo[i].sMnc[2],
+                g_CellInfo[i].sLac, g_CellInfo[i].sCellID, g_CellInfo[i].iRxLev);
+        }
+    } else {
+        UART_Printf("Cell info not available\r\n");
+    }
+}
+
+const char* Network_GetCellInfoString(void)
+{
+    return g_cellInfoStr;
 }
 
 // the function is called whenever the network state changes
@@ -144,8 +193,8 @@ void NetworkInit(HANDLE taskHandle)
     apn_workaround_pending = false;
 
     // Dummy APN (index 1) context is set once at system init
-    memset(&NetContextArr[1], 0, sizeof(NetContextArr[1]));
-    strncpy(NetContextArr[1].apn, "dummy_apn", sizeof(NetContextArr[1].apn)-1);
+    memset(&g_NetContextArr[1], 0, sizeof(g_NetContextArr[1]));
+    strncpy(g_NetContextArr[1].apn, "dummy_apn", sizeof(g_NetContextArr[1].apn)-1);
 
     NetworkMonitorTimer(taskHandle);
 
@@ -156,10 +205,10 @@ void NetworkInit(HANDLE taskHandle)
 // Helper to initialize the real APN context
 static void SetApnContext() {
     // Real APN (index 0)
-    memset(&NetContextArr[0], 0, sizeof(NetContextArr[0]));
-    strncpy(NetContextArr[0].apn, g_ConfigStore.apn, sizeof(NetContextArr[0].apn)-1);
-    strncpy(NetContextArr[0].userName, g_ConfigStore.apn_user, sizeof(NetContextArr[0].userName)-1);
-    strncpy(NetContextArr[0].userPasswd, g_ConfigStore.apn_pass, sizeof(NetContextArr[0].userPasswd)-1);
+    memset(&g_NetContextArr[0], 0, sizeof(g_NetContextArr[0]));
+    strncpy(g_NetContextArr[0].apn, g_ConfigStore.apn, sizeof(g_NetContextArr[0].apn)-1);
+    strncpy(g_NetContextArr[0].userName, g_ConfigStore.apn_user, sizeof(g_NetContextArr[0].userName)-1);
+    strncpy(g_NetContextArr[0].userPasswd, g_ConfigStore.apn_pass, sizeof(g_NetContextArr[0].userPasswd)-1);
 }
 
 bool NetworkAttachActivate()
@@ -209,12 +258,12 @@ bool NetworkAttachActivate()
             LOGI("Using valid APN to activate the network");
             SetApnContext();
             NetworkUpdateStatus(NETWORK_STATUS_ACTIVATING);
-            ret = Network_StartActive(NetContextArr[0]); // real APN
+            ret = Network_StartActive(g_NetContextArr[0]); // real APN
             apn_workaround_pending = true;
         } else {
             LOGI("Using dummy APN to workaround re-activation defect");
             NetworkUpdateStatus(NETWORK_STATUS_ACTIVATING);
-            ret = Network_StartActive(NetContextArr[1]); // dummy
+            ret = Network_StartActive(g_NetContextArr[1]); // dummy
             apn_workaround_pending = false;
         }
         if (!ret) {

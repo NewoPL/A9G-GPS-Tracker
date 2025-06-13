@@ -2,6 +2,7 @@
 #include <api_hal_gpio.h>
 
 #include "system.h"
+#include "utils.h"
 #include "gps_tracker.h"
 #include "led_handler.h"
 

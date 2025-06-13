@@ -3,9 +3,10 @@
 
 #include <api_os.h>
 #include <api_socket.h>
-#include <api_hal_uart.h>
 #include <api_ssl.h>
 
+
+#include "utils.h"
 #include "http.h"
 #include "config_store.h"
 #include "debug.h"
@@ -218,8 +219,8 @@ int Http_Post(bool          secure,
     const char* fmt = "POST %s HTTP/1.1\r\n"
                       "Host: %s\r\n"
                       "Content-Type: application/x-www-form-urlencoded\r\n"
-                      "Connection: close\r\n"
-                      "Content-Length: %d\r\n\r\n%s";
+                      "Connection: Keep-Alive\r\n"
+                      "Content-Length: %d\r\n\r\n%s\r\n";
 
     // Calculate the required buffer size
     int bufferLen = snprintf(NULL, 0, fmt, path, hostName, dataLen, data);

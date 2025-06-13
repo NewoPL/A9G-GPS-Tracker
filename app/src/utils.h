@@ -1,6 +1,30 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#include "minmea.h"
+
+// Protocol
+typedef enum {
+    PROT_HTTP = 0,
+    PROT_HTTPS
+} t_protocol;
+
+// Log levels
+typedef enum {
+    LOG_LEVEL_NONE = 0,
+    LOG_LEVEL_ERROR,
+    LOG_LEVEL_WARN,
+    LOG_LEVEL_INFO,
+    LOG_LEVEL_DEBUG
+} t_logLevel;
+
+// Log output
+typedef enum {
+    LOGGER_OUTPUT_UART = 0,
+    LOGGER_OUTPUT_TRACE,
+    LOGGER_OUTPUT_FILE
+} t_logOutput;
+
 /**
  * @brief Test function for file system information.
  *

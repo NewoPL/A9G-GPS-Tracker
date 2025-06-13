@@ -5,7 +5,8 @@
 
 extern int32_t      g_log_file;
 
-void UART_Printf(const char* fmt, ...) ;
+int32_t UART_Printf(const char* fmt, ...) ;
+int32_t FILE_Printf(const char* fmt, ...);
 
 void log_message_internal(t_logLevel level, const char *func, const char *format, ...);
 #define LOG(level, format, ...) \

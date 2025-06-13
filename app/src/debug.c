@@ -1,20 +1,14 @@
-#include <stdio.h>
-#include <ctype.h>
-#include <stdarg.h>
-#include <string.h>
-
 #include <api_fs.h>
 #include <api_hal_uart.h>
 
+#include "utils.h"
 #include "config_store.h"
-#include "config_commands.h"
 #include "config_validation.h"
-#include "minmea.h"
 #include "debug.h"
 
 int32_t g_log_file;
 
-void UART_Printf(const char* fmt, ...) 
+int32_t UART_Printf(const char* fmt, ...) 
 {
     char buffer[LOG_LEVEL_BUFFER_SIZE];
     va_list args;
@@ -29,7 +23,7 @@ void UART_Printf(const char* fmt, ...)
 
         UART_Write(UART1, buffer, (size_t)len);
     }
-    return;
+    return 0;
 }
 
 int32_t FILE_Printf(const char* fmt, ...)

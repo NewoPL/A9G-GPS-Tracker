@@ -9,14 +9,13 @@
 #include "gps_parse.h"
 
 #include "system.h"
+#include "utils.h"
 #include "network.h"
 #include "led_handler.h"
 #include "gps_tracker.h"
 #include "sms_service.h"
 #include "config_store.h"
 #include "config_commands.h"
-#include "minmea.h"
-#include "utils.h"
 #include "debug.h"
 
 #define MODULE_TAG "System"
@@ -58,7 +57,7 @@ static void EventHandler(API_Event_t* pEvent)
             LOGE("network detached");
             break;
         case API_EVENT_ID_SIGNAL_QUALITY:
-            g_RSSI = csq_to_percent(pEvent->param1);
+            NetworkSigQualityCallback(pEvent->param1);
             break;
         case API_EVENT_ID_NETWORK_CELL_INFO:
             NetworkCellInfoCallback((Network_Location_t*)pEvent->pParam1, pEvent->param1);
@@ -68,11 +67,15 @@ static void EventHandler(API_Event_t* pEvent)
             INITIALIZED_ON();
             break;
         case API_EVENT_ID_SMS_RECEIVED:
-            HandleSmsReceived(pEvent);
+            SmsReceivedCallback(
+                (SMS_Encode_Type_t)pEvent->param1,
+                (const char*) pEvent->pParam1,
+                (const char*)pEvent->pParam2,
+                (uint32_t)pEvent->param2);
             break;
         case API_EVENT_ID_SMS_LIST_MESSAGE: {
             SMS_Message_Info_t* msg = (SMS_Message_Info_t*)pEvent->pParam1;
-            HandleSmsListEvent(msg);
+            SmsListMessageCallback(msg);
             break;
         }
         case API_EVENT_ID_GPS_UART_RECEIVED:
@@ -119,7 +122,7 @@ void app_MainTask(void *pData)
     ConfigStore_Init();
     FsInfoTest();    
     gps_Init();
-    SMSInit();
+    SmsInit();
 
     trackerTaskHandle = OS_CreateTask(
         gps_TrackerTask, NULL, NULL,
